@@ -29,10 +29,12 @@ app.add_middleware(
 from app.routes.academic import router as academic_router
 from app.routes.notes import router as notes_router
 from app.routes.documents import router as documents_router
+from app.routes.code_runner import router as code_runner_router
 
 app.include_router(academic_router)
 app.include_router(notes_router)
 app.include_router(documents_router)
+app.include_router(code_runner_router)
 
 # Serve downloads, processed media, and documents
 app.mount("/static/downloads", StaticFiles(directory=DOWNLOADS_DIR), name="downloads")
