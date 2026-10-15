@@ -1,0 +1,466 @@
+import React, { useState } from 'react'
+import axios from 'axios'
+import {
+  Video,
+  Download,
+  ShieldCheck,
+  Image as ImageIcon,
+  Sparkles,
+  Layers,
+  ArrowRight,
+  CheckCircle2,
+  FileCheck,
+  Sliders,
+  Scissors
+} from 'lucide-react'
+
+export default function MediaStudio() {
+  const [activeTab, setActiveTab] = useState('downloader') // 'downloader' | 'antidup' | 'nobg'
+
+  // Video Downloader states
+  const [dlUrl, setDlUrl] = useState('')
+  const [dlLoading, setDlLoading] = useState(false)
+  const [videoInfo, setVideoInfo] = useState(null)
+  const [downloadResult, setDownloadResult] = useState(null)
+
+  // Anti Duplicate states
+  const [antiDupType, setAntiDupType] = useState('video') // 'video' | 'image'
+  const [antiFile, setAntiFile] = useState(null)
+  const [antiSpeed, setAntiSpeed] = useState(1.008)
+  const [antiMicroZoom, setAntiMicroZoom] = useState(true)
+  const [antiLoading, setAntiLoading] = useState(false)
+  const [antiResult, setAntiResult] = useState(null)
+
+  // Background Remover states
+  const [bgFile, setBgFile] = useState(null)
+  const [bgLoading, setBgLoading] = useState(false)
+  const [bgResult, setBgResult] = useState(null)
+
+  // 1. Fetch Video Info
+  const handleFetchInfo = async (e) => {
+    e.preventDefault()
+    setDlLoading(true)
+    setVideoInfo(null)
+    setDownloadResult(null)
+    try {
+      const res = await axios.post('/api/media/info', { url: dlUrl })
+      setVideoInfo(res.data)
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Không thể lấy thông tin video. Vui lòng kiểm tra lại link.')
+    } finally {
+      setDlLoading(false)
+    }
+  }
+
+  // Download Video / Audio
+  const handleDownload = async (formatType) => {
+    setDlLoading(true)
+    try {
+      const res = await axios.post('/api/media/download', {
+        url: dlUrl,
+        format_type: formatType
+      })
+      setDownloadResult(res.data)
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Lỗi khi tải video')
+    } finally {
+      setDlLoading(false)
+    }
+  }
+
+  // 2. Anti-Duplicate Process
+  const handleAntiDupSubmit = async (e) => {
+    e.preventDefault()
+    if (!antiFile) return
+    setAntiLoading(true)
+    setAntiResult(null)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', antiFile)
+
+      let res
+      if (antiDupType === 'video') {
+        formData.append('speed_factor', antiSpeed)
+        formData.append('micro_zoom', antiMicroZoom)
+        res = await axios.post('/api/media/anti-duplicate/video', formData)
+      } else {
+        formData.append('mode', 'smart')
+        res = await axios.post('/api/media/anti-duplicate/image', formData)
+      }
+      setAntiResult(res.data)
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Lỗi khi xử lý lách trùng lặp')
+    } finally {
+      setAntiLoading(false)
+    }
+  }
+
+  // 3. Background Removal
+  const handleBgRemoval = async (e) => {
+    e.preventDefault()
+    if (!bgFile) return
+    setBgLoading(true)
+    setBgResult(null)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', bgFile)
+      const res = await axios.post('/api/tools/remove-bg', formData)
+      setBgResult(res.data)
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Lỗi khi tách nền ảnh')
+    } finally {
+      setBgLoading(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6 pb-12">
+      {/* Studio Header & Tab Switching */}
+      <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+          <div>
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <Video className="w-5 h-5 text-purple-400" />
+              Xưởng Sáng Tạo Media & Lách Bản Quyền MXH
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">
+              Bộ công cụ tải video sạch logo, tách nền ảnh và can thiệp chữ ký số video để đăng mạng xã hội không bị quét trùng
+            </p>
+          </div>
+
+          <div className="flex bg-slate-800 p-1 rounded-2xl text-xs font-semibold">
+            <button
+              onClick={() => setActiveTab('downloader')}
+              className={`px-4 py-2 rounded-xl transition-all ${activeTab === 'downloader' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+            >
+              Tải Video Sạch Logo
+            </button>
+            <button
+              onClick={() => setActiveTab('antidup')}
+              className={`px-4 py-2 rounded-xl transition-all ${activeTab === 'antidup' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+            >
+              Lách Quét Trùng Lặp
+            </button>
+            <button
+              onClick={() => setActiveTab('nobg')}
+              className={`px-4 py-2 rounded-xl transition-all ${activeTab === 'nobg' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+            >
+              Tách Nền AI
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* TAB 1: VIDEO DOWNLOADER */}
+      {activeTab === 'downloader' && (
+        <div className="space-y-6">
+          <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6">
+            <h3 className="font-bold text-sm text-slate-300 uppercase tracking-wider mb-3">
+              Dán link video TikTok hoặc YouTube
+            </h3>
+
+            <form onSubmit={handleFetchInfo} className="flex flex-col sm:flex-row gap-3">
+              <input
+                type="url"
+                required
+                placeholder="https://www.tiktok.com/@user/video/... hoặc https://youtube.com/shorts/..."
+                value={dlUrl}
+                onChange={e => setDlUrl(e.target.value)}
+                className="flex-1 px-4 py-3 rounded-2xl bg-slate-800 border border-slate-700 text-white text-xs md:text-sm font-mono focus:border-purple-500 focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={dlLoading}
+                className="px-6 py-3 rounded-2xl bg-purple-600 hover:bg-purple-500 disabled:bg-purple-900 text-white font-semibold text-xs md:text-sm flex items-center justify-center gap-2 shadow-lg shadow-purple-600/30"
+              >
+                <Download className="w-4 h-4" />
+                <span>{dlLoading ? 'Đang phân tích...' : 'Lấy Link Tải'}</span>
+              </button>
+            </form>
+          </div>
+
+          {videoInfo && (
+            <div className="bg-slate-900/90 border border-purple-500/30 rounded-3xl p-6 shadow-2xl flex flex-col md:flex-row gap-6 animate-in fade-in duration-300">
+              {videoInfo.thumbnail && (
+                <div className="w-full md:w-56 h-40 md:h-auto rounded-2xl overflow-hidden bg-slate-950 flex-shrink-0">
+                  <img
+                    src={videoInfo.thumbnail}
+                    alt="thumbnail"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
+
+              <div className="flex-1 flex flex-col justify-between">
+                <div>
+                  <span className="px-2.5 py-1 rounded-md bg-purple-500/20 text-purple-300 text-xs font-semibold">
+                    {videoInfo.platform}
+                  </span>
+                  <h4 className="font-bold text-base md:text-lg text-white mt-2 leading-snug">
+                    {videoInfo.title}
+                  </h4>
+                  <div className="text-xs text-slate-400 mt-2 space-y-1">
+                    <div>Tác giả: <span className="text-slate-200">{videoInfo.uploader}</span></div>
+                    {videoInfo.duration > 0 && <div>Thời lượng: {videoInfo.duration} giây</div>}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-3 mt-6 pt-4 border-t border-slate-800">
+                  <button
+                    onClick={() => handleDownload('video')}
+                    disabled={dlLoading}
+                    className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-purple-600/30"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Tải Video MP4 (Sạch Logo)</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleDownload('audio')}
+                    disabled={dlLoading}
+                    className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Tải Âm Thanh MP3</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {downloadResult && (
+            <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-3xl p-6 flex items-center justify-between gap-4 animate-in fade-in">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                  <CheckCircle2 className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-white">Video đã được tải về máy thành công!</h4>
+                  <p className="text-xs text-emerald-400/90 font-mono mt-0.5">{downloadResult.filename}</p>
+                </div>
+              </div>
+
+              <a
+                href={downloadResult.download_url}
+                download
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                <span>Lưu Về Máy</span>
+              </a>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 2: ANTI DUPLICATE PROCESSOR */}
+      {activeTab === 'antidup' && (
+        <div className="space-y-6">
+          <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-sm text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-purple-400" />
+                Bộ Lọc Lách Quét Trùng Lặp (TikTok, Reels, Shorts)
+              </h3>
+
+              <div className="flex bg-slate-800 p-1 rounded-xl text-xs">
+                <button
+                  type="button"
+                  onClick={() => { setAntiDupType('video'); setAntiFile(null); setAntiResult(null); }}
+                  className={`px-3 py-1 rounded-lg ${antiDupType === 'video' ? 'bg-purple-600 text-white' : 'text-slate-400'}`}
+                >
+                  Xử lý Video
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setAntiDupType('image'); setAntiFile(null); setAntiResult(null); }}
+                  className={`px-3 py-1 rounded-lg ${antiDupType === 'image' ? 'bg-purple-600 text-white' : 'text-slate-400'}`}
+                >
+                  Xử lý Ảnh
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleAntiDupSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">
+                  Chọn tệp {antiDupType === 'video' ? 'Video (MP4, MOV)' : 'Hình Ảnh (JPG, PNG)'} cần lách bản quyền:
+                </label>
+                <input
+                  type="file"
+                  required
+                  accept={antiDupType === 'video' ? 'video/*' : 'image/*'}
+                  onChange={e => setAntiFile(e.target.files[0])}
+                  className="w-full text-xs text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-500"
+                />
+              </div>
+
+              {antiDupType === 'video' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-800/40 p-4 rounded-2xl border border-slate-800">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Vi chỉnh tốc độ (Speed Shift): {antiSpeed}x
+                    </label>
+                    <input
+                      type="range"
+                      min="1.002"
+                      max="1.03"
+                      step="0.002"
+                      value={antiSpeed}
+                      onChange={e => setAntiSpeed(parseFloat(e.target.value))}
+                      className="w-full accent-purple-500"
+                    />
+                    <span className="text-[11px] text-slate-400">
+                      Thay đổi thời lượng và âm phổ mili-giây không làm méo tiếng
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3 pt-4 sm:pt-0">
+                    <input
+                      type="checkbox"
+                      id="microzoom"
+                      checked={antiMicroZoom}
+                      onChange={e => setAntiMicroZoom(e.target.checked)}
+                      className="w-4 h-4 accent-purple-500 rounded"
+                    />
+                    <label htmlFor="microzoom" className="text-xs text-slate-300 cursor-pointer">
+                      Micro-zoom (Cắt viền 2px chống thuật toán quét khung hình đối xứng)
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={antiLoading || !antiFile}
+                className="w-full py-3 rounded-2xl bg-purple-600 hover:bg-purple-500 disabled:bg-slate-800 text-white font-bold text-sm shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2"
+              >
+                <Sliders className="w-4 h-4" />
+                <span>{antiLoading ? 'Đang can thiệp dữ liệu & re-encode...' : 'Tiến Hành Lách Thuật Toán'}</span>
+              </button>
+            </form>
+          </div>
+
+          {antiResult && (
+            <div className="bg-slate-900 border border-purple-500/30 rounded-3xl p-6 shadow-2xl space-y-4 animate-in fade-in">
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-base text-white flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                  Xử lý hoàn tất! File đã có chữ ký số mới tinh
+                </h4>
+                <a
+                  href={antiResult.processed_url}
+                  download
+                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-purple-600/30"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Tải File Đã Lách</span>
+                </a>
+              </div>
+
+              {/* MD5 Comparison */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
+                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                  <span className="text-slate-500 block mb-1">Mã MD5 Ban Đầu:</span>
+                  <span className="text-red-400 break-all">{antiResult.original_md5}</span>
+                </div>
+                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                  <span className="text-slate-500 block mb-1">Mã MD5 Mới (Sau Biến Đổi):</span>
+                  <span className="text-emerald-400 break-all">{antiResult.new_md5}</span>
+                </div>
+              </div>
+
+              {/* Applied Tricks List */}
+              <div className="bg-slate-800/30 rounded-2xl p-4">
+                <div className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                  Các kỹ thuật đã áp dụng để vượt qua thuật toán:
+                </div>
+                <ul className="space-y-1.5 text-xs text-slate-400">
+                  {antiResult.applied_tricks.map((trick, idx) => (
+                    <li key={idx} className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+                      <span>{trick}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 3: AI BACKGROUND REMOVER */}
+      {activeTab === 'nobg' && (
+        <div className="space-y-6">
+          <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6">
+            <h3 className="font-bold text-sm text-slate-300 uppercase tracking-wider mb-3 flex items-center gap-2">
+              <Scissors className="w-4 h-4 text-purple-400" />
+              Tách Nền Vật Thể & Chủ Thể Bằng AI
+            </h3>
+
+            <form onSubmit={handleBgRemoval} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">
+                  Chọn ảnh chứa vật thể hoặc người cần xóa phông:
+                </label>
+                <input
+                  type="file"
+                  required
+                  accept="image/*"
+                  onChange={e => setBgFile(e.target.files[0])}
+                  className="w-full text-xs text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-500"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={bgLoading || !bgFile}
+                className="w-full py-3 rounded-2xl bg-purple-600 hover:bg-purple-500 disabled:bg-slate-800 text-white font-bold text-sm shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2"
+              >
+                <Scissors className="w-4 h-4" />
+                <span>{bgLoading ? 'AI đang phân tích & tách nền...' : 'Xóa Phông Nền (PNG Transparent)'}</span>
+              </button>
+            </form>
+          </div>
+
+          {bgResult && (
+            <div className="bg-slate-900 border border-purple-500/30 rounded-3xl p-6 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6 animate-in fade-in">
+              {/* Image preview with checkerboard background */}
+              <div
+                className="w-64 h-64 rounded-2xl overflow-hidden border border-slate-700 flex items-center justify-center p-2"
+                style={{
+                  backgroundImage: 'linear-gradient(45deg, #1e293b 25%, transparent 25%), linear-gradient(-45deg, #1e293b 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #1e293b 75%), linear-gradient(-45deg, transparent 75%, #1e293b 75%)',
+                  backgroundSize: '20px 20px',
+                  backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
+                }}
+              >
+                <img
+                  src={bgResult.result_url}
+                  alt="Transparent result"
+                  className="max-w-full max-h-full object-contain drop-shadow-xl"
+                />
+              </div>
+
+              <div className="flex-1 space-y-3">
+                <h4 className="font-bold text-lg text-white">Ảnh Đã Xóa Phông Thành Công!</h4>
+                <p className="text-xs text-slate-400">
+                  Nền ảnh đã được chuyển đổi hoàn toàn sang kênh alpha trong suốt (PNG), bạn có thể ném vào Photoshop, Canva hoặc ghép vào video mà không bị viền trắng.
+                </p>
+                <a
+                  href={bgResult.result_url}
+                  download
+                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Tải Ảnh PNG Trong Suốt</span>
+                </a>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
