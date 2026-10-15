@@ -31,12 +31,14 @@ from app.routes.notes import router as notes_router
 from app.routes.documents import router as documents_router
 from app.routes.code_runner import router as code_runner_router
 from app.routes.media import router as media_router
+from app.routes.smart_tools import router as smart_tools_router
 
 app.include_router(academic_router)
 app.include_router(notes_router)
 app.include_router(documents_router)
 app.include_router(code_runner_router)
 app.include_router(media_router)
+app.include_router(smart_tools_router)
 
 # Serve downloads, processed media, and documents
 app.mount("/static/downloads", StaticFiles(directory=DOWNLOADS_DIR), name="downloads")
