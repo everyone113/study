@@ -1,7 +1,11 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
 from typing import Optional
+from pathlib import Path
+import shutil
+
 from app.services.media_downloader import extract_media_info, download_media
+from app.services.anti_duplicate import process_image_anti_duplicate, process_video_anti_duplicate
 from app.config import DOWNLOADS_DIR, PROCESSED_DIR
 
 router = APIRouter(prefix="/api/media", tags=["Media"])
@@ -43,6 +47,57 @@ async def list_downloaded_media():
                 files.append({
                     "filename": f.name,
                     "url": f"/static/downloads/{f.name}",
+                    "size": f.stat().st_size,
+                    "created_at": f.stat().st_mtime
+                })
+    files.sort(key=lambda x: x["created_at"], reverse=True)
+    return files
+
+@router.post("/anti-duplicate/image")
+async def anti_duplicate_image_endpoint(
+    file: UploadFile = File(...),
+    mode: Optional[str] = Form("smart")
+):
+    try:
+        content = await file.read()
+        res = process_image_anti_duplicate(content, file.filename or "image.jpg", mode=mode or "smart")
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi xử lý ảnh: {str(e)}")
+
+@router.post("/anti-duplicate/video")
+async def anti_duplicate_video_endpoint(
+    file: UploadFile = File(...),
+    speed_factor: Optional[float] = Form(1.008),
+    micro_zoom: Optional[bool] = Form(True)
+):
+    temp_input = PROCESSED_DIR / f"temp_in_{file.filename}"
+    try:
+        with open(temp_input, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+
+        res = process_video_anti_duplicate(
+            input_file_path=temp_input,
+            original_filename=file.filename or "video.mp4",
+            speed_factor=speed_factor or 1.008,
+            micro_zoom=micro_zoom if micro_zoom is not None else True
+        )
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi xử lý video: {str(e)}")
+    finally:
+        if temp_input.exists():
+            temp_input.unlink(missing_ok=True)
+
+@router.get("/processed")
+async def list_processed_media():
+    files = []
+    if PROCESSED_DIR.exists():
+        for f in PROCESSED_DIR.glob("*"):
+            if f.is_file() and not f.name.startswith("."):
+                files.append({
+                    "filename": f.name,
+                    "url": f"/static/processed/{f.name}",
                     "size": f.stat().st_size,
                     "created_at": f.stat().st_mtime
                 })
