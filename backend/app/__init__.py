@@ -1,0 +1,1 @@
+# StudyMediaHub backend package
