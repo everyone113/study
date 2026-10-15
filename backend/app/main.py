@@ -26,6 +26,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from app.routes.academic import router as academic_router
+app.include_router(academic_router)
+
 # Serve downloads, processed media, and documents
 app.mount("/static/downloads", StaticFiles(directory=DOWNLOADS_DIR), name="downloads")
 app.mount("/static/processed", StaticFiles(directory=PROCESSED_DIR), name="processed")
