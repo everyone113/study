@@ -9,7 +9,8 @@ import {
   QrCode,
   Layers,
   HeartPulse,
-  Flame
+  Flame,
+  Layout
 } from 'lucide-react'
 
 export const NAV_ITEMS = [
@@ -19,6 +20,7 @@ export const NAV_ITEMS = [
   { id: 'anatomy', label: 'Giải phẫu 3D', icon: HeartPulse, badge: 'Y Khoa', category: 'study' },
   { id: 'documents', label: 'Kho & Tải tài liệu', icon: FileDown, badge: null, category: 'study' },
   { id: 'code', label: 'Phòng Code', icon: Terminal, badge: 'Java/C++', category: 'study' },
+  { id: 'uikit', label: 'Kho Giao Diện', icon: Layout, badge: 'UI Kit', category: 'media' },
   { id: 'animation', label: 'Animation Studio', icon: Flame, badge: '60 FPS', category: 'media' },
   { id: 'media', label: 'Xưởng Media', icon: Video, badge: 'Anti-Dup', category: 'media' },
   { id: 'smart', label: 'Tiện ích AI', icon: Sparkles, badge: 'Live Sub', category: 'media' },

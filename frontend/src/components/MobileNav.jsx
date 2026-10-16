@@ -9,18 +9,19 @@ import {
   QrCode,
   Layers,
   HeartPulse,
-  Flame
+  Flame,
+  Layout
 } from 'lucide-react'
 
 export default function MobileNav({ currentTab, setCurrentTab }) {
   const quickTabs = [
     { id: 'dashboard', label: 'Home', icon: Layers },
     { id: 'academic', label: 'Điểm', icon: GraduationCap },
-    { id: 'notes', label: 'Lịch', icon: CalendarCheck },
+    { id: 'uikit', label: 'UI Kit', icon: Layout },
     { id: 'animation', label: 'FX Studio', icon: Flame },
+    { id: 'notes', label: 'Lịch', icon: CalendarCheck },
     { id: 'anatomy', label: 'Giải phẫu', icon: HeartPulse },
     { id: 'code', label: 'Code', icon: Terminal },
-    { id: 'media', label: 'Media', icon: Video },
     { id: 'smart', label: 'AI Tool', icon: Sparkles },
     { id: 'mobile', label: 'WiFi Drop', icon: QrCode },
   ]
