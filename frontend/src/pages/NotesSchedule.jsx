@@ -19,6 +19,9 @@ export default function NotesSchedule() {
   const [filterSubject, setFilterSubject] = useState('')
   const [filterCompleted, setFilterCompleted] = useState('')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [deleteTargetNote, setDeleteTargetNote] = useState(null)
+  const [showCleanCompletedModal, setShowCleanCompletedModal] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const [newNote, setNewNote] = useState({
     title: '',
@@ -91,10 +94,30 @@ export default function NotesSchedule() {
     }
   }
 
-  const handleDelete = async (id) => {
-    if (confirm('Xóa ghi chú này?')) {
-      await axios.delete(`/api/notes/${id}`)
+  const confirmDeleteNote = async () => {
+    if (!deleteTargetNote) return
+    setDeleting(true)
+    try {
+      await axios.delete(`/api/notes/${deleteTargetNote.id}`)
+      setDeleteTargetNote(null)
       fetchNotes()
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Lỗi khi xóa ghi chú')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const confirmCleanCompleted = async () => {
+    setDeleting(true)
+    try {
+      await axios.delete('/api/notes/completed')
+      setShowCleanCompletedModal(false)
+      fetchNotes()
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Lỗi khi dọn dẹp ghi chú')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -148,6 +171,16 @@ export default function NotesSchedule() {
           <option value="0">Đang chờ xử lý</option>
           <option value="1">Đã hoàn thành</option>
         </select>
+
+        {notes.some(n => n.is_completed === 1) && (
+          <button
+            onClick={() => setShowCleanCompletedModal(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-semibold border border-red-500/20 transition-colors sm:ml-auto"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Dọn dẹp ghi chú đã xong</span>
+          </button>
+        )}
       </div>
 
       {/* Notes List */}
@@ -179,8 +212,9 @@ export default function NotesSchedule() {
                   </div>
 
                   <button
-                    onClick={() => handleDelete(note.id)}
-                    className="text-slate-500 hover:text-red-400 p-1"
+                    onClick={() => setDeleteTargetNote(note)}
+                    title="Xóa ghi chú này"
+                    className="text-slate-400 hover:text-red-400 p-1.5 rounded-lg hover:bg-red-500/10 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -342,6 +376,84 @@ export default function NotesSchedule() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal: Delete Single Note */}
+      {deleteTargetNote && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-sm p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-red-400">
+              <div className="p-3 bg-red-500/10 rounded-2xl">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-white">Xác nhận xóa ghi chú</h3>
+                <p className="text-xs text-slate-400">Hành động này không thể hoàn tác</p>
+              </div>
+            </div>
+            <div className="p-3 rounded-xl bg-slate-800/60 text-xs text-slate-300 font-medium break-words">
+              "{deleteTargetNote.title}"
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setDeleteTargetNote(null)}
+                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={confirmDeleteNote}
+                className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-lg shadow-red-600/30 flex items-center gap-2"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{deleting ? 'Đang xóa...' : 'Xóa vĩnh viễn'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal: Clean All Completed Notes */}
+      {showCleanCompletedModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-sm p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-red-400">
+              <div className="p-3 bg-red-500/10 rounded-2xl">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-white">Dọn dẹp ghi chú cũ</h3>
+                <p className="text-xs text-slate-400">Xóa tất cả các ghi chú đã xong</p>
+              </div>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Bạn có chắc chắn muốn xóa toàn bộ các ghi chú đã đánh dấu hoàn thành khỏi hệ thống không?
+            </p>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setShowCleanCompletedModal(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={confirmCleanCompleted}
+                className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-lg shadow-red-600/30 flex items-center gap-2"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{deleting ? 'Đang dọn dẹp...' : 'Xóa tất cả'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

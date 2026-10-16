@@ -80,6 +80,12 @@ async def toggle_note(id: int, db: aiosqlite.Connection = Depends(get_db)):
     updated = await cursor.fetchone()
     return dict(updated)
 
+@router.delete("/completed")
+async def delete_completed_notes(db: aiosqlite.Connection = Depends(get_db)):
+    await db.execute("DELETE FROM notes WHERE is_completed = 1")
+    await db.commit()
+    return {"status": "ok", "message": "All completed notes deleted"}
+
 @router.delete("/{id}")
 async def delete_note(id: int, db: aiosqlite.Connection = Depends(get_db)):
     await db.execute("DELETE FROM notes WHERE id = ?", (id,))

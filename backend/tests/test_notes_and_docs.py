@@ -35,6 +35,20 @@ async def test_notes_crud_and_toggle():
         notes = res_list.json()
         assert any(n["id"] == note_id for n in notes)
 
+        # 4. Delete note by ID
+        res_del = await client.delete(f"/api/notes/{note_id}")
+        assert res_del.status_code == 200
+        assert res_del.json()["status"] == "ok"
+
+        # Verify it's deleted
+        res_list_after = await client.get("/api/notes")
+        assert not any(n["id"] == note_id for n in res_list_after.json())
+
+        # 5. Delete all completed notes
+        res_del_completed = await client.delete("/api/notes/completed")
+        assert res_del_completed.status_code == 200
+        assert res_del_completed.json()["status"] == "ok"
+
 @pytest.mark.anyio
 async def test_document_download_url_and_list():
     from app.main import app

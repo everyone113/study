@@ -12,7 +12,10 @@ import {
   Award,
   CheckCircle2,
   Clock,
-  BookOpen
+  BookOpen,
+  Trash2,
+  CheckCircle,
+  Circle
 } from 'lucide-react'
 
 export default function Dashboard({ setCurrentTab }) {
@@ -39,6 +42,24 @@ export default function Dashboard({ setCurrentTab }) {
       console.error('Error fetching dashboard data', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleToggleNote = async (id) => {
+    try {
+      await axios.put(`/api/notes/${id}/toggle`)
+      fetchDashboardData()
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const handleDeleteNote = async (id) => {
+    try {
+      await axios.delete(`/api/notes/${id}`)
+      fetchDashboardData()
+    } catch (err) {
+      console.error(err)
     }
   }
 
@@ -244,11 +265,27 @@ export default function Dashboard({ setCurrentTab }) {
                       {n.subject_name && <span>• {n.subject_name}</span>}
                     </div>
                   </div>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
-                    n.priority === 'high' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'
-                  }`}>
-                    {n.tag || 'Note'}
-                  </span>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                      n.priority === 'high' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'
+                    }`}>
+                      {n.tag || 'Note'}
+                    </span>
+                    <button
+                      onClick={() => handleToggleNote(n.id)}
+                      title="Đánh dấu hoàn thành"
+                      className="text-slate-400 hover:text-emerald-400 p-1 rounded-lg hover:bg-emerald-500/10 transition-colors"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteNote(n.id)}
+                      title="Xóa ghi chú"
+                      className="text-slate-400 hover:text-red-400 p-1 rounded-lg hover:bg-red-500/10 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
