@@ -1,7 +1,13 @@
 import aiosqlite
 from app.config import DATABASE_PATH
 
+_db_initialized = False
+
 async def get_db():
+    global _db_initialized
+    if not _db_initialized:
+        await init_db()
+        _db_initialized = True
     db = await aiosqlite.connect(DATABASE_PATH)
     db.row_factory = aiosqlite.Row
     try:

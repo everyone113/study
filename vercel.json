@@ -3,7 +3,8 @@
   "services": {
     "backend": {
       "root": "backend",
-      "framework": "fastapi"
+      "framework": "fastapi",
+      "entrypoint": "main:app"
     },
     "frontend": {
       "root": "frontend",
@@ -14,19 +15,22 @@
     {
       "source": "/api/(.*)",
       "destination": {
-        "service": "backend"
+        "service": "backend",
+        "path": "/api/$1"
       }
     },
     {
       "source": "/static/(.*)",
       "destination": {
-        "service": "backend"
+        "service": "backend",
+        "path": "/static/$1"
       }
     },
     {
       "source": "/drop",
       "destination": {
-        "service": "backend"
+        "service": "backend",
+        "path": "/drop"
       }
     },
     {

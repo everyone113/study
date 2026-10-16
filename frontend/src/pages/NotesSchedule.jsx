@@ -53,9 +53,13 @@ export default function NotesSchedule() {
   const fetchSubjects = async () => {
     try {
       const res = await axios.get('/api/subjects')
-      setSubjects(res.data)
+      if (Array.isArray(res.data)) setSubjects(res.data)
     } catch (err) {
-      console.error(err)
+      console.warn('NotesSchedule fetchSubjects fallback to local storage', err)
+      try {
+        const cachedSub = JSON.parse(localStorage.getItem('studymedia_academic_subjects') || '[]')
+        if (cachedSub.length > 0) setSubjects(cachedSub)
+      } catch (e) {}
     }
   }
 

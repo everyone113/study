@@ -37,11 +37,17 @@ export default function Dashboard({ setCurrentTab }) {
         axios.get('/api/subjects'),
         axios.get('/api/notes')
       ])
-      setGpaSummary(resGpa.data)
-      setSubjects(resSub.data)
-      setNotes(resNotes.data)
+      if (resGpa.data) setGpaSummary(resGpa.data)
+      if (Array.isArray(resSub.data)) setSubjects(resSub.data)
+      if (Array.isArray(resNotes.data)) setNotes(resNotes.data)
     } catch (err) {
-      console.error('Error fetching dashboard data', err)
+      console.warn('Dashboard API fallback to local storage', err)
+      try {
+        const cachedSub = JSON.parse(localStorage.getItem('studymedia_academic_subjects') || '[]')
+        const cachedGpa = JSON.parse(localStorage.getItem('studymedia_gpa_summary') || 'null')
+        if (cachedSub.length > 0) setSubjects(cachedSub)
+        if (cachedGpa) setGpaSummary(cachedGpa)
+      } catch (e) {}
     } finally {
       setLoading(false)
     }
