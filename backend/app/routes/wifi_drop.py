@@ -9,21 +9,48 @@ from app.config import DROP_DIR, FRONTEND_PORT, PORT
 
 router = APIRouter(prefix="/api/drop", tags=["WiFi Drop"])
 
-def get_local_ip() -> str:
-    """Detect the active primary LAN IP address on Wi-Fi/Ethernet."""
+def get_all_local_ips() -> List[str]:
+    """Detect all active IP addresses, prioritizing real Wi-Fi/LAN (192.168.x.x)."""
+    ips = []
+    # 1. From gethostbyname_ex
+    try:
+        host_ips = socket.gethostbyname_ex(socket.gethostname())[2]
+        for ip in host_ips:
+            if not ip.startswith("127.") and ip not in ips:
+                ips.append(ip)
+    except Exception:
+        pass
+
+    # 2. From UDP socket
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.settimeout(0.5)
-        # Does not actually establish internet connection or send packets
         s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
+        connected_ip = s.getsockname()[0]
         s.close()
-        return ip
+        if connected_ip not in ips and not connected_ip.startswith("127."):
+            ips.append(connected_ip)
     except Exception:
-        try:
-            return socket.gethostbyname(socket.gethostname())
-        except Exception:
-            return "127.0.0.1"
+        pass
+
+    # Sort priorities: 192.168.x.x (typical Wi-Fi) > 10.x.x.x > others; 26.x (Radmin VPN) last
+    def priority(ip: str):
+        if ip.startswith("192.168."):
+            return 1
+        if ip.startswith("10."):
+            return 2
+        if ip.startswith("172."):
+            return 3
+        if ip.startswith("26."):  # Radmin VPN
+            return 99
+        return 10
+
+    ips.sort(key=priority)
+    return ips
+
+def get_local_ip() -> str:
+    ips = get_all_local_ips()
+    return ips[0] if ips else "127.0.0.1"
 
 def format_size(size_bytes: int) -> str:
     if size_bytes < 1024:
@@ -49,10 +76,12 @@ def get_file_type(extension: str) -> str:
 
 @router.get("/network-info")
 async def get_network_info():
-    """Returns local LAN IP, port, and direct mobile upload URL for QR code."""
-    ip = get_local_ip()
+    """Returns local LAN IP, port, all detected IPs, and direct mobile upload URL for QR code."""
+    all_ips = get_all_local_ips()
+    ip = all_ips[0] if all_ips else "127.0.0.1"
     return {
         "local_ip": ip,
+        "all_ips": all_ips,
         "frontend_port": FRONTEND_PORT,
         "backend_port": PORT,
         "upload_url": f"http://{ip}:{FRONTEND_PORT}/?mode=drop"

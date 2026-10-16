@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
+import { QRCodeSVG } from 'qrcode.react'
 import {
   QrCode,
   Smartphone,
@@ -38,11 +39,13 @@ export default function MobileConnect({ setCurrentTab }) {
   })()
 
   const [activeTab, setActiveTab] = useState(isDropModeParam ? 'mobile_uploader' : 'hub') // 'hub' | 'mobile_uploader' | 'pwa'
+  const [selectedIp, setSelectedIp] = useState('')
   const [networkInfo, setNetworkInfo] = useState({
-    local_ip: '127.0.0.1',
+    local_ip: '192.168.9.55',
+    all_ips: ['192.168.9.55'],
     frontend_port: 5173,
     backend_port: 8000,
-    upload_url: ''
+    upload_url: 'http://192.168.9.55:5173/?mode=drop'
   })
   const [copied, setCopied] = useState(false)
 
@@ -86,16 +89,22 @@ export default function MobileConnect({ setCurrentTab }) {
     try {
       const res = await axios.get('/api/drop/network-info')
       setNetworkInfo(res.data)
+      if (res.data.local_ip) {
+        setSelectedIp(res.data.local_ip)
+      }
     } catch (err) {
       console.error('Không thể lấy thông tin mạng:', err)
       const host = window.location.hostname
+      const fallbackIp = (host === 'localhost' || host === '127.0.0.1') ? '192.168.9.55' : host
       const port = window.location.port || '5173'
       setNetworkInfo({
-        local_ip: host,
+        local_ip: fallbackIp,
+        all_ips: [fallbackIp],
         frontend_port: port,
         backend_port: 8000,
-        upload_url: `http://${host}:${port}/?mode=drop`
+        upload_url: `http://${fallbackIp}:${port}/?mode=drop`
       })
+      setSelectedIp(fallbackIp)
     }
   }
 
@@ -111,9 +120,10 @@ export default function MobileConnect({ setCurrentTab }) {
     }
   }
 
-  // Generate dynamic QR code URL
-  const qrTargetUrl = networkInfo.upload_url || `http://${window.location.hostname}:${window.location.port || 5173}/?mode=drop`
-  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrTargetUrl)}&bgcolor=0f172a&color=38bdf8&margin=10`
+  // Compute active IP and QR target URL
+  const activeIp = selectedIp || networkInfo.local_ip || '192.168.9.55'
+  const activePort = networkInfo.frontend_port || window.location.port || '5173'
+  const qrTargetUrl = `http://${activeIp}:${activePort}/?mode=drop`
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(qrTargetUrl)
@@ -305,12 +315,36 @@ export default function MobileConnect({ setCurrentTab }) {
             <div className="lg:col-span-5 bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-6 flex flex-col items-center justify-center text-center shadow-2xl relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
-              {/* QR Image with glow frame */}
-              <div className="p-3.5 bg-slate-950 rounded-3xl border border-blue-500/30 shadow-2xl shadow-blue-500/10 mb-4 transition-transform group-hover:scale-105 duration-300">
-                <img
-                  src={qrImageUrl}
-                  alt="QR Code Bắn Ảnh"
-                  className="w-52 h-52 rounded-2xl object-contain"
+              {/* Network adapter selector if multiple IPs detected */}
+              {networkInfo.all_ips && networkInfo.all_ips.length > 1 && (
+                <div className="w-full max-w-sm mb-3 flex items-center justify-center gap-1.5 p-1 bg-slate-950 rounded-2xl border border-slate-800 text-[11px]">
+                  <span className="text-slate-400 pl-1 font-semibold">Chọn mạng:</span>
+                  {networkInfo.all_ips.map(ip => (
+                    <button
+                      key={ip}
+                      type="button"
+                      onClick={() => setSelectedIp(ip)}
+                      className={`px-2.5 py-1 rounded-xl font-mono font-bold transition-all ${
+                        activeIp === ip
+                          ? 'bg-blue-600 text-white shadow-md'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                      }`}
+                    >
+                      {ip.startsWith('192.168.') ? `📶 Wi-Fi (${ip})` : ip.startsWith('26.') ? `🛡️ VPN (${ip})` : ip}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Local Vector QR Code (Offline 0ms rendering) */}
+              <div className="p-4 bg-slate-950 rounded-3xl border border-blue-500/30 shadow-2xl shadow-blue-500/10 mb-3 transition-transform group-hover:scale-105 duration-300 flex items-center justify-center">
+                <QRCodeSVG
+                  value={qrTargetUrl}
+                  size={210}
+                  level="M"
+                  bgColor="#020617"
+                  fgColor="#38bdf8"
+                  className="rounded-xl shadow-lg"
                 />
               </div>
 
@@ -318,13 +352,13 @@ export default function MobileConnect({ setCurrentTab }) {
                 <span>Quét Bằng Camera Điện Thoại</span>
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
               </div>
-              <p className="text-xs text-slate-400 max-w-xs mb-4 leading-relaxed">
-                Mở Camera iPhone hoặc Zalo/Google Lens trên Android quét mã này ➔ Chọn ảnh từ Album và bắn sang máy tính ngay lập tức!
+              <p className="text-xs text-slate-400 max-w-xs mb-3 leading-relaxed">
+                Mở Camera iPhone hoặc Zalo/Google Lens quét mã QR để mở kho ảnh chọn nhiều ảnh cùng lúc!
               </p>
 
               {/* Real URL box */}
-              <div className="w-full max-w-sm bg-slate-900 border border-slate-700/80 rounded-2xl p-2.5 flex items-center gap-2 text-xs font-mono">
-                <span className="flex-1 truncate text-blue-300 select-all">{qrTargetUrl}</span>
+              <div className="w-full max-w-sm bg-slate-900 border border-slate-700/80 rounded-2xl p-2.5 flex items-center gap-2 text-xs font-mono mb-2">
+                <span className="flex-1 truncate text-blue-300 select-all font-bold">{qrTargetUrl}</span>
                 <button
                   onClick={handleCopyLink}
                   title="Sao chép link"
@@ -341,6 +375,10 @@ export default function MobileConnect({ setCurrentTab }) {
                 >
                   <ExternalLink className="w-4 h-4" />
                 </a>
+              </div>
+
+              <div className="text-[11px] text-slate-400 bg-slate-950/60 p-2 rounded-xl border border-slate-800/80 w-full max-w-sm">
+                💡 <span className="text-slate-300 font-semibold">Nếu quét chậm:</span> Mở Safari hoặc Chrome trên điện thoại, gõ thẳng địa chỉ <strong className="text-amber-300 font-mono">{activeIp}:{activePort}</strong> là vào ngay!
               </div>
             </div>
 
