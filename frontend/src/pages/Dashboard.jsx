@@ -21,9 +21,36 @@ import {
 } from 'lucide-react'
 
 export default function Dashboard({ setCurrentTab }) {
-  const [gpaSummary, setGpaSummary] = useState({ gpa_4: 0, gpa_10: 0, total_credits: 0, classification: 'Chưa có dữ liệu' })
-  const [subjects, setSubjects] = useState([])
-  const [notes, setNotes] = useState([])
+  const [gpaSummary, setGpaSummary] = useState(() => {
+    try {
+      const cached = localStorage.getItem('studymedia_gpa_summary')
+      if (cached) return JSON.parse(cached)
+    } catch (e) {}
+    return { gpa_4: 0, gpa_10: 0, total_credits: 0, graded_credits: 0, classification: 'Chưa có điểm' }
+  })
+
+  const [subjects, setSubjects] = useState(() => {
+    try {
+      const cached = localStorage.getItem('studymedia_academic_subjects')
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (Array.isArray(parsed)) return parsed
+      }
+    } catch (e) {}
+    return []
+  })
+
+  const [notes, setNotes] = useState(() => {
+    try {
+      const cached = localStorage.getItem('studymedia_notes')
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (Array.isArray(parsed)) return parsed
+      }
+    } catch (e) {}
+    return []
+  })
+
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -37,18 +64,27 @@ export default function Dashboard({ setCurrentTab }) {
         axios.get('/api/subjects'),
         axios.get('/api/notes')
       ])
-      if (resGpa.data) setGpaSummary(resGpa.data)
-      if (Array.isArray(resSub.data)) setSubjects(resSub.data)
-      if (Array.isArray(resNotes.data)) setNotes(resNotes.data)
+      if (resGpa.data && typeof resGpa.data === 'object') {
+        setGpaSummary(resGpa.data)
+        try { localStorage.setItem('studymedia_gpa_summary', JSON.stringify(resGpa.data)) } catch (e) {}
+      }
+      if (Array.isArray(resSub.data)) {
+        setSubjects(resSub.data)
+        try { localStorage.setItem('studymedia_academic_subjects', JSON.stringify(resSub.data)) } catch (e) {}
+      }
+      if (Array.isArray(resNotes.data)) {
+        setNotes(resNotes.data)
+        try { localStorage.setItem('studymedia_notes', JSON.stringify(resNotes.data)) } catch (e) {}
+      }
     } catch (err) {
       console.warn('Dashboard API fallback to local storage', err)
       try {
         const cachedSub = JSON.parse(localStorage.getItem('studymedia_academic_subjects') || '[]')
         const cachedGpa = JSON.parse(localStorage.getItem('studymedia_gpa_summary') || 'null')
         const cachedNotes = JSON.parse(localStorage.getItem('studymedia_notes') || '[]')
-        if (cachedSub.length > 0) setSubjects(cachedSub)
-        if (cachedGpa) setGpaSummary(cachedGpa)
-        if (cachedNotes.length > 0) setNotes(cachedNotes)
+        if (Array.isArray(cachedSub) && cachedSub.length > 0) setSubjects(cachedSub)
+        if (cachedGpa && typeof cachedGpa === 'object') setGpaSummary(cachedGpa)
+        if (Array.isArray(cachedNotes) && cachedNotes.length > 0) setNotes(cachedNotes)
       } catch (e) {}
     } finally {
       setLoading(false)
@@ -85,7 +121,15 @@ export default function Dashboard({ setCurrentTab }) {
     fetchDashboardData()
   }
 
-  const pendingNotes = notes.filter(n => !n.is_completed)
+  const safeNotes = Array.isArray(notes) ? notes : []
+  const safeSubjects = Array.isArray(subjects) ? subjects : []
+  const pendingNotes = safeNotes.filter(n => !n?.is_completed)
+
+  const gpa4 = Number(gpaSummary?.gpa_4) || 0
+  const gpa10 = Number(gpaSummary?.gpa_10) || 0
+  const totalCredits = Number(gpaSummary?.total_credits) || 0
+  const gradedCredits = Number(gpaSummary?.graded_credits) || 0
+  const classification = gpaSummary?.classification || 'Chưa có điểm'
 
   return (
     <div className="space-y-6 pb-12">
@@ -100,7 +144,7 @@ export default function Dashboard({ setCurrentTab }) {
             Chào mừng bạn đến với <span className="bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">StudyMediaHub</span>
           </h1>
           <p className="text-sm md:text-base text-slate-300 mt-2 leading-relaxed">
-            Dữ liệu được lưu trữ trực tiếp trên ổ D. Quản lý môn học, luyện code Java/C++, tải video không logo và lách bản quyền video mượt mà trên cả PC và Điện thoại.
+            Dữ liệu được lưu trữ an toàn. Quản lý môn học, bảng điểm GPA, ghi chú deadline, luyện code Java/C++, tải video và tiện ích học tập mượt mà trên cả PC và Điện thoại.
           </p>
         </div>
 
@@ -118,11 +162,11 @@ export default function Dashboard({ setCurrentTab }) {
               <Award className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl md:text-3xl font-extrabold text-white">
-            {gpaSummary.gpa_4.toFixed(2)}
+          <div className="text-2xl md:text-3xl font-extrabold text-white font-mono">
+            {gpa4.toFixed(2)}
           </div>
           <div className="text-xs text-blue-400 font-medium mt-1">
-            Xếp loại: {gpaSummary.classification}
+            Xếp loại: {classification}
           </div>
         </div>
 
@@ -134,11 +178,11 @@ export default function Dashboard({ setCurrentTab }) {
               <TrendingUp className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl md:text-3xl font-extrabold text-white">
-            {gpaSummary.gpa_10.toFixed(2)}
+          <div className="text-2xl md:text-3xl font-extrabold text-white font-mono">
+            {gpa10.toFixed(2)}
           </div>
           <div className="text-xs text-slate-400 mt-1">
-            Tổng số tín chỉ: {gpaSummary.total_credits}
+            Tổng số tín chỉ: {totalCredits}
           </div>
         </div>
 
@@ -150,11 +194,11 @@ export default function Dashboard({ setCurrentTab }) {
               <BookOpen className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl md:text-3xl font-extrabold text-white">
-            {subjects.length}
+          <div className="text-2xl md:text-3xl font-extrabold text-white font-mono">
+            {safeSubjects.length}
           </div>
           <div className="text-xs text-emerald-400 mt-1">
-            {gpaSummary.graded_credits || 0} tín chỉ đã có điểm
+            {gradedCredits} tín chỉ đã có điểm
           </div>
         </div>
 
@@ -166,7 +210,7 @@ export default function Dashboard({ setCurrentTab }) {
               <Clock className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl md:text-3xl font-extrabold text-white">
+          <div className="text-2xl md:text-3xl font-extrabold text-white font-mono">
             {pendingNotes.length}
           </div>
           <div className="text-xs text-amber-400 mt-1">
@@ -348,13 +392,13 @@ export default function Dashboard({ setCurrentTab }) {
             </button>
           </div>
 
-          {subjects.length === 0 ? (
+          {safeSubjects.length === 0 ? (
             <div className="text-center py-8 text-slate-500 text-sm">
               Chưa có môn học nào. Hãy bấm "Thêm môn học" ở mục Môn & Điểm số.
             </div>
           ) : (
             <div className="space-y-2.5">
-              {subjects.slice(0, 4).map(s => (
+              {safeSubjects.slice(0, 4).map(s => (
                 <div
                   key={s.id}
                   className="flex items-center justify-between p-3 rounded-xl bg-slate-800/40 border border-slate-800/60"
@@ -375,7 +419,7 @@ export default function Dashboard({ setCurrentTab }) {
                   </div>
 
                   <div>
-                    {s.grade && s.grade.total_score_10 !== null ? (
+                    {s.grade && s.grade.total_score_10 !== null && s.grade.total_score_10 !== undefined ? (
                       <span className="px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold font-mono">
                         {s.grade.total_score_10} ({s.grade.letter_grade})
                       </span>
