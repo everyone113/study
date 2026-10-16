@@ -14,6 +14,7 @@ import MediaStudio from './pages/MediaStudio'
 import SmartUtilities from './pages/SmartUtilities'
 import MobileConnect from './pages/MobileConnect'
 import AnatomyAtlas from './pages/AnatomyAtlas'
+import AnimationLab from './pages/AnimationLab'
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -92,6 +93,8 @@ export default function App() {
         return <DocumentLibrary />
       case 'code':
         return <CodePlayground />
+      case 'animation':
+        return <AnimationLab />
       case 'media':
         return <MediaStudio />
       case 'smart':

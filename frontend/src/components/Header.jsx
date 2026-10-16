@@ -27,6 +27,7 @@ export default function Header({ currentTab, setCurrentTab }) {
     anatomy: 'Atlas Giải Phẫu Học 3D • Y Khoa (Svitylo 3D)',
     documents: 'Kho Tài Liệu & Tải File Trực Tuyến',
     code: 'Phòng Lập Trình & Ôn Code (Java, C++, Python)',
+    animation: 'Phòng Thí Nghiệm Animation & Motion FX (GSAP, Framer Motion, Anime.js, CSS)',
     media: 'Xưởng Sáng Tạo Media & Lách Quét Trùng Lặp',
     smart: 'Tiện Ích AI (Dịch Sub Realtime, TTS, Flashcard)',
     mobile: 'Kết Nối Đa Thiết Bị (PC & Điện Thoại)'

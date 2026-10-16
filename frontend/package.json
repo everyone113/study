@@ -9,8 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "animejs": "^4.5.0",
     "axios": "^1.6.8",
     "canvas-confetti": "^1.9.2",
+    "framer-motion": "^14.3.0",
+    "gsap": "^3.15.0",
     "lucide-react": "^0.363.0",
     "peerjs": "^1.5.5",
     "qrcode.react": "^4.2.0",

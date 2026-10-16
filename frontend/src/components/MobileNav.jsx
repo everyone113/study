@@ -8,7 +8,8 @@ import {
   Sparkles,
   QrCode,
   Layers,
-  HeartPulse
+  HeartPulse,
+  Flame
 } from 'lucide-react'
 
 export default function MobileNav({ currentTab, setCurrentTab }) {
@@ -16,6 +17,7 @@ export default function MobileNav({ currentTab, setCurrentTab }) {
     { id: 'dashboard', label: 'Home', icon: Layers },
     { id: 'academic', label: 'Điểm', icon: GraduationCap },
     { id: 'notes', label: 'Lịch', icon: CalendarCheck },
+    { id: 'animation', label: 'FX Studio', icon: Flame },
     { id: 'anatomy', label: 'Giải phẫu', icon: HeartPulse },
     { id: 'code', label: 'Code', icon: Terminal },
     { id: 'media', label: 'Media', icon: Video },
