@@ -8,6 +8,8 @@ backend/downloads/*
 !backend/downloads/.gitkeep
 backend/processed/*
 !backend/processed/.gitkeep
+backend/wifidrop/*
+!backend/wifidrop/.gitkeep
 frontend/node_modules/
 frontend/dist/
 .DS_Store
