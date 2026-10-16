@@ -24,6 +24,7 @@ export default function Header({ currentTab, setCurrentTab }) {
     dashboard: 'Bảng Điều Khiển Tổng Quan',
     academic: 'Quản Lý Môn Học & Tính Điểm GPA',
     notes: 'Ghi Chú, Lịch Trình & Deadline',
+    anatomy: 'Atlas Giải Phẫu Học 3D • Y Khoa (Svitylo 3D)',
     documents: 'Kho Tài Liệu & Tải File Trực Tuyến',
     code: 'Phòng Lập Trình & Ôn Code (Java, C++, Python)',
     media: 'Xưởng Sáng Tạo Media & Lách Quét Trùng Lặp',

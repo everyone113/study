@@ -17,7 +17,8 @@ import {
   CheckCircle,
   Circle,
   QrCode,
-  Wifi
+  Wifi,
+  HeartPulse
 } from 'lucide-react'
 
 export default function Dashboard({ setCurrentTab }) {
@@ -239,6 +240,25 @@ export default function Dashboard({ setCurrentTab }) {
               </div>
             </div>
             <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-blue-400 transition-colors" />
+          </button>
+
+          <button
+            onClick={() => setCurrentTab('anatomy')}
+            className="flex items-center justify-between p-4 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-rose-500/40 hover:bg-slate-800/60 transition-all text-left group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <HeartPulse className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="font-bold text-sm text-white flex items-center gap-1.5">
+                  <span>Atlas Giải Phẫu 3D</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-semibold">Y Khoa</span>
+                </div>
+                <div className="text-xs text-slate-400">Mô hình 3D & tra cứu</div>
+              </div>
+            </div>
+            <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-rose-400 transition-colors" />
           </button>
 
           <button

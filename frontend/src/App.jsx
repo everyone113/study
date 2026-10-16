@@ -13,6 +13,7 @@ import CodePlayground from './pages/CodePlayground'
 import MediaStudio from './pages/MediaStudio'
 import SmartUtilities from './pages/SmartUtilities'
 import MobileConnect from './pages/MobileConnect'
+import AnatomyAtlas from './pages/AnatomyAtlas'
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -85,6 +86,8 @@ export default function App() {
         return <AcademicDashboard />
       case 'notes':
         return <NotesSchedule />
+      case 'anatomy':
+        return <AnatomyAtlas setCurrentTab={setCurrentTab} />
       case 'documents':
         return <DocumentLibrary />
       case 'code':
