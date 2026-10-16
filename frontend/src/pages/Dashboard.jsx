@@ -15,7 +15,9 @@ import {
   BookOpen,
   Trash2,
   CheckCircle,
-  Circle
+  Circle,
+  QrCode,
+  Wifi
 } from 'lucide-react'
 
 export default function Dashboard({ setCurrentTab }) {
@@ -221,6 +223,25 @@ export default function Dashboard({ setCurrentTab }) {
               </div>
             </div>
             <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-pink-400 transition-colors" />
+          </button>
+
+          <button
+            onClick={() => setCurrentTab('mobile')}
+            className="flex items-center justify-between p-4 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-emerald-500/40 hover:bg-slate-800/60 transition-all text-left group sm:col-span-2 lg:col-span-1"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <QrCode className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="font-bold text-sm text-white flex items-center gap-1.5">
+                  <span>WiFi Drop</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                </div>
+                <div className="text-xs text-slate-400">Quét QR bắn ảnh từ ĐT</div>
+              </div>
+            </div>
+            <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-emerald-400 transition-colors" />
           </button>
         </div>
       </div>

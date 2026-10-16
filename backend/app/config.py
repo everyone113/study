@@ -6,11 +6,13 @@ DATA_DIR = BASE_DIR / "data"
 DOWNLOADS_DIR = BASE_DIR / "downloads"
 PROCESSED_DIR = BASE_DIR / "processed"
 DOCUMENTS_DIR = BASE_DIR / "documents"
+DROP_DIR = BASE_DIR / "wifidrop"
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
 PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 DOCUMENTS_DIR.mkdir(parents=True, exist_ok=True)
+DROP_DIR.mkdir(parents=True, exist_ok=True)
 
 DATABASE_PATH = DATA_DIR / "studymedia.db"
 

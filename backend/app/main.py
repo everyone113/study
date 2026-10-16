@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.config import DOWNLOADS_DIR, PROCESSED_DIR, DOCUMENTS_DIR
+from app.config import DOWNLOADS_DIR, PROCESSED_DIR, DOCUMENTS_DIR, DROP_DIR
 from app.database import init_db
 
 @asynccontextmanager
@@ -33,6 +33,7 @@ from app.routes.code_runner import router as code_runner_router
 from app.routes.media import router as media_router
 from app.routes.smart_tools import router as smart_tools_router
 from app.routes.subtitles import router as subtitles_router
+from app.routes.wifi_drop import router as wifi_drop_router
 
 app.include_router(academic_router)
 app.include_router(notes_router)
@@ -41,11 +42,13 @@ app.include_router(code_runner_router)
 app.include_router(media_router)
 app.include_router(smart_tools_router)
 app.include_router(subtitles_router)
+app.include_router(wifi_drop_router)
 
-# Serve downloads, processed media, and documents
+# Serve downloads, processed media, documents, and wifi drop
 app.mount("/static/downloads", StaticFiles(directory=DOWNLOADS_DIR), name="downloads")
 app.mount("/static/processed", StaticFiles(directory=PROCESSED_DIR), name="processed")
 app.mount("/static/documents", StaticFiles(directory=DOCUMENTS_DIR), name="documents")
+app.mount("/static/wifidrop", StaticFiles(directory=DROP_DIR), name="wifidrop")
 
 @app.get("/api/health")
 async def health_check():

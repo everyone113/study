@@ -14,7 +14,15 @@ import SmartUtilities from './pages/SmartUtilities'
 import MobileConnect from './pages/MobileConnect'
 
 export default function App() {
-  const [currentTab, setCurrentTab] = useState('dashboard')
+  const [currentTab, setCurrentTab] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search)
+      if (params.get('mode') === 'drop') return 'mobile'
+      const tab = params.get('tab')
+      if (tab) return tab
+    } catch (e) {}
+    return 'dashboard'
+  })
 
   const renderContent = () => {
     switch (currentTab) {
@@ -33,7 +41,7 @@ export default function App() {
       case 'smart':
         return <SmartUtilities />
       case 'mobile':
-        return <MobileConnect />
+        return <MobileConnect setCurrentTab={setCurrentTab} />
       default:
         return <Dashboard setCurrentTab={setCurrentTab} />
     }

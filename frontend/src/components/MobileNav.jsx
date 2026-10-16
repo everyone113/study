@@ -18,7 +18,7 @@ export default function MobileNav({ currentTab, setCurrentTab }) {
     { id: 'code', label: 'Code', icon: Terminal },
     { id: 'media', label: 'Media', icon: Video },
     { id: 'smart', label: 'AI Tool', icon: Sparkles },
-    { id: 'mobile', label: 'Kết nối', icon: QrCode },
+    { id: 'mobile', label: 'WiFi Drop', icon: QrCode },
   ]
 
   return (

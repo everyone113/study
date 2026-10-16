@@ -20,7 +20,7 @@ export const NAV_ITEMS = [
   { id: 'code', label: 'Phòng Code', icon: Terminal, badge: 'Java/C++', category: 'code' },
   { id: 'media', label: 'Xưởng Media', icon: Video, badge: 'Anti-Dup', category: 'media' },
   { id: 'smart', label: 'Tiện ích AI', icon: Sparkles, badge: 'Live Sub', category: 'tools' },
-  { id: 'mobile', label: 'Kết nối Mobile', icon: QrCode, badge: 'Wi-Fi/4G', category: 'system' },
+  { id: 'mobile', label: 'WiFi Drop & Mobile', icon: QrCode, badge: 'Bắn ảnh', category: 'system' },
 ]
 
 export default function Sidebar({ currentTab, setCurrentTab }) {
