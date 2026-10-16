@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react'
+import React, { useState, useMemo, useRef, useEffect } from 'react'
 import {
   HeartPulse,
   Activity,
@@ -17,13 +17,10 @@ import {
   Stethoscope,
   X,
   ChevronRight,
-  ChevronDown,
   Info,
   Compass,
   Eye,
-  EyeOff,
-  Bone,
-  Filter
+  Bone
 } from 'lucide-react'
 
 // Bộ Cơ Sở Dữ Liệu Giải Phẫu Y Khoa Toàn Diện (Bilingual VN - Latin - EN)
@@ -452,85 +449,36 @@ export default function AnatomyAtlas({ setCurrentTab }) {
   const [copiedNotice, setCopiedNotice] = useState(null)
   const iframeRef = useRef(null)
 
-  // Floating Vietnamese Medical Systems Menu State (Matches the requested UI screenshot)
-  const [isVnMenuOpen, setIsVnMenuOpen] = useState(true)
-  const [showHiddenAll, setShowHiddenAll] = useState(false)
-  const [treeSearch, setTreeSearch] = useState('')
-  const [expandedSystems, setExpandedSystems] = useState({
-    skeletal: true,
-    muscular: false,
-    regions: false,
-    joints: false,
-    cardiovascular: false,
-    visceral: false,
-    nervous: false,
-    lymphoid: false,
-    attachments: false
-  })
+  // Listen to 3D selections inside the native iframe
+  useEffect(() => {
+    const handleMessage = (e) => {
+      if (e.data && e.data.type === 'ANATOMY_SELECT' && e.data.ids && e.data.ids.length > 0) {
+        const id = e.data.ids[0]
+        // Check if ID matches any system or organ
+        for (const sys of ANATOMY_SYSTEMS) {
+          if (id.startsWith(sys.id) || id === sys.id) {
+            setSelectedSystem(sys.id)
+            const organMatch = sys.organs.find(o =>
+              id.toLowerCase().includes(o.english.toLowerCase().split(' ')[0]) ||
+              o.keyStructures.some(k => id.toLowerCase().includes(k.toLowerCase().split(' ')[0]))
+            )
+            if (organMatch) {
+              setSelectedOrgan(organMatch)
+            }
+            break
+          }
+        }
+      }
+    }
 
-  // Visibility toggles for each system in the tree
-  const [visibleSystems, setVisibleSystems] = useState({
-    regions: true,
-    muscular: true,
-    skeletal: true,
-    joints: true,
-    cardiovascular: true,
-    visceral: true,
-    nervous: true,
-    lymphoid: true,
-    attachments: false // default unchecked in anatomy atlas
-  })
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
+  }, [])
 
   // Current active system object
   const currentSystemObj = useMemo(() => {
     return ANATOMY_SYSTEMS.find(s => s.id === selectedSystem) || ANATOMY_SYSTEMS[2]
   }, [selectedSystem])
-
-  // Filter systems in the tree based on quick text
-  const filteredTreeSystems = useMemo(() => {
-    if (!treeSearch.trim()) return ANATOMY_SYSTEMS
-    const q = treeSearch.toLowerCase().trim()
-    return ANATOMY_SYSTEMS.filter(sys => {
-      const matchSys = sys.name.toLowerCase().includes(q) ||
-        sys.english.toLowerCase().includes(q) ||
-        sys.latin.toLowerCase().includes(q)
-      const matchOrgan = sys.organs.some(o =>
-        o.name.toLowerCase().includes(q) ||
-        o.latin.toLowerCase().includes(q) ||
-        o.english.toLowerCase().includes(q)
-      )
-      return matchSys || matchOrgan
-    })
-  }, [treeSearch])
-
-  // Toggle system expansion
-  const toggleSystemExpand = (sysId, e) => {
-    e.stopPropagation()
-    setExpandedSystems(prev => ({
-      ...prev,
-      [sysId]: !prev[sysId]
-    }))
-  }
-
-  // Toggle system visibility
-  const toggleSystemVisibility = (sysId, e) => {
-    e.stopPropagation()
-    setVisibleSystems(prev => ({
-      ...prev,
-      [sysId]: !prev[sysId]
-    }))
-  }
-
-  // Toggle show all / hidden
-  const handleToggleShowHidden = () => {
-    const nextState = !showHiddenAll
-    setShowHiddenAll(nextState)
-    const newVis = {}
-    ANATOMY_SYSTEMS.forEach(s => {
-      newVis[s.id] = nextState
-    })
-    setVisibleSystems(newVis)
-  }
 
   // Filtered organs across all systems based on general search
   const searchResults = useMemo(() => {
@@ -603,7 +551,7 @@ export default function AnatomyAtlas({ setCurrentTab }) {
   const reloadIframe = () => {
     setIframeLoaded(false)
     if (iframeRef.current) {
-      iframeRef.current.src = 'https://svitylo.com/3d-anatomy-atlas'
+      iframeRef.current.src = '/atlas/index.html'
     }
   }
 
@@ -621,7 +569,7 @@ export default function AnatomyAtlas({ setCurrentTab }) {
                 Atlas Giải Phẫu Học 3D • Y Khoa
               </h1>
               <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold font-mono">
-                🇻🇳 Việt Hóa 100%
+                🇻🇳 Tiếng Việt Tích Hợp Sẵn
               </span>
             </div>
             <p className="text-xs md:text-sm text-slate-400 mt-0.5">
@@ -667,7 +615,7 @@ export default function AnatomyAtlas({ setCurrentTab }) {
           </div>
 
           <a
-            href="https://svitylo.com/3d-anatomy-atlas"
+            href="/atlas/index.html"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium border border-slate-700 transition-colors"
@@ -706,19 +654,9 @@ export default function AnatomyAtlas({ setCurrentTab }) {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setIsVnMenuOpen(!isVnMenuOpen)}
-                    className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border ${
-                      isVnMenuOpen
-                        ? 'bg-rose-600/20 border-rose-500/40 text-rose-300'
-                        : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
-                    }`}
-                    title="Bật/Tắt Menu Hệ Cơ Quan Tiếng Việt"
-                  >
-                    <Layers className="w-3.5 h-3.5" />
-                    <span>{isVnMenuOpen ? 'Ẩn Menu' : 'Hiện Menu VN'}</span>
-                  </button>
-
+                  <span className="text-[11px] text-emerald-400 font-semibold px-2 py-0.5 rounded-md bg-emerald-950/60 border border-emerald-500/30">
+                    Ngôn ngữ: Tiếng Việt 🇻🇳
+                  </span>
                   <button
                     onClick={reloadIframe}
                     className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
@@ -742,241 +680,29 @@ export default function AnatomyAtlas({ setCurrentTab }) {
                   <div className="w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-400 mb-4 animate-bounce">
                     <HeartPulse className="w-6 h-6" />
                   </div>
-                  <h3 className="font-bold text-white text-base mb-1">Đang khởi tạo mô hình 3D Atlas...</h3>
+                  <h3 className="font-bold text-white text-base mb-1">Đang khởi tạo mô hình 3D Atlas…</h3>
                   <p className="text-xs text-slate-400 max-w-sm leading-relaxed">
-                    Tải dữ liệu hình học 3D (3 triệu đa giác, nén meshopt). Lần đầu tải mất vài giây tùy tốc độ mạng.
+                    Nạp hình học 3D cơ thể người và danh pháp Y khoa tiếng Việt.
                   </p>
                 </div>
               )}
 
-              {/* Responsive Embedded Iframe */}
+              {/* Responsive Embedded Iframe - Self-hosted with Native Vietnamese */}
               <iframe
                 ref={iframeRef}
-                src="https://svitylo.com/3d-anatomy-atlas"
+                src="/atlas/index.html"
                 onLoad={() => setIframeLoaded(true)}
-                title="Svitylo 3D Anatomy Atlas"
+                title="Atlas Giải Phẫu Học 3D Y Khoa"
                 className="w-full h-full flex-1 border-0 bg-slate-950"
                 allow="accelerometer; camera; gyroscope; web-share; fullscreen"
                 loading="eager"
               />
-
-              {/* FLOATING VIETNAMESE MEDICAL SYSTEMS PANEL (Overlay directly matching screenshot) */}
-              {isVnMenuOpen ? (
-                <div className="absolute top-14 left-3 z-20 w-72 sm:w-80 max-w-[calc(100%-24px)] max-h-[calc(100%-72px)] bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-left-2 duration-200">
-                  {/* Panel Header */}
-                  <div className="px-4 py-3 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Layers className="w-4 h-4 text-rose-400" />
-                      <span className="font-bold text-sm text-white">Hệ Cơ Quan (Systems)</span>
-                      <span className="text-[10px] bg-rose-500/20 text-rose-300 font-bold px-1.5 py-0.5 rounded">
-                        Y Khoa
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => setIsVnMenuOpen(false)}
-                      className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-                      title="Thu gọn menu"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {/* Show / Hide All Structures Button (Matching "Show hidden (705)") */}
-                  <div className="p-2 border-b border-slate-800/80 bg-slate-950/40">
-                    <button
-                      onClick={handleToggleShowHidden}
-                      className={`w-full py-2 px-3 rounded-xl border text-xs font-semibold flex items-center gap-2.5 transition-all ${
-                        showHiddenAll
-                          ? 'bg-rose-950/50 border-rose-500/40 text-rose-300'
-                          : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700/80 text-slate-200'
-                      }`}
-                    >
-                      {showHiddenAll ? <Eye className="w-4 h-4 text-emerald-400" /> : <Eye className="w-4 h-4 text-slate-400" />}
-                      <span>{showHiddenAll ? 'Đang hiện tất cả cấu trúc (705)' : 'Hiện các cấu trúc ẩn (705)'}</span>
-                    </button>
-                  </div>
-
-                  {/* Quick Filter Box */}
-                  <div className="px-2 pt-2 pb-1">
-                    <div className="relative">
-                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        placeholder="Lọc hệ cơ quan..."
-                        value={treeSearch}
-                        onChange={e => setTreeSearch(e.target.value)}
-                        className="w-full pl-8 pr-7 py-1.5 rounded-lg bg-slate-950/60 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500"
-                      />
-                      {treeSearch && (
-                        <button
-                          onClick={() => setTreeSearch('')}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Hierarchical Medical Systems Tree */}
-                  <div className="flex-1 overflow-y-auto p-2 space-y-1 scrollbar-thin scrollbar-thumb-slate-700">
-                    {filteredTreeSystems.map(sys => {
-                      const isSelected = selectedSystem === sys.id
-                      const isExpanded = expandedSystems[sys.id]
-                      const isVisible = visibleSystems[sys.id]
-
-                      return (
-                        <div key={sys.id} className="rounded-xl overflow-hidden">
-                          {/* System Row */}
-                          <div
-                            onClick={() => {
-                              setSelectedSystem(sys.id)
-                              setSelectedOrgan(sys.organs[0])
-                            }}
-                            className={`flex items-center justify-between px-2.5 py-2 rounded-xl cursor-pointer transition-all ${
-                              isSelected
-                                ? 'bg-blue-600/30 border border-blue-500/50 text-white shadow-sm'
-                                : 'hover:bg-slate-800/60 text-slate-300'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 min-w-0 flex-1">
-                              {/* Chevron expand */}
-                              <button
-                                onClick={(e) => toggleSystemExpand(sys.id, e)}
-                                className="p-0.5 rounded hover:bg-slate-700/50 text-slate-400 hover:text-white"
-                              >
-                                {isExpanded ? (
-                                  <ChevronDown className="w-3.5 h-3.5" />
-                                ) : (
-                                  <ChevronRight className="w-3.5 h-3.5" />
-                                )}
-                              </button>
-
-                              {/* Eye visibility toggle */}
-                              <button
-                                onClick={(e) => toggleSystemVisibility(sys.id, e)}
-                                className={`p-0.5 rounded transition-colors ${
-                                  isVisible ? 'text-emerald-400 hover:text-emerald-300' : 'text-slate-500 hover:text-slate-400'
-                                }`}
-                                title={isVisible ? 'Ẩn hệ này' : 'Hiện hệ này'}
-                              >
-                                {isVisible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                              </button>
-
-                              {/* System Label */}
-                              <div className="truncate">
-                                <div className="text-xs font-semibold leading-tight truncate">
-                                  {sys.name}
-                                </div>
-                                <div className="text-[10px] text-slate-400 font-mono truncate">
-                                  {sys.english}
-                                </div>
-                              </div>
-                            </div>
-
-                            <span className="text-[10px] text-slate-500 font-mono pl-1 shrink-0">
-                              {sys.organs.length}
-                            </span>
-                          </div>
-
-                          {/* Expanded Organs Subtree */}
-                          {isExpanded && (
-                            <div className="ml-5 pl-2.5 my-1 border-l border-slate-700/60 space-y-1">
-                              {sys.organs.map((organ, oIdx) => {
-                                const isOrganCur = selectedOrgan?.name === organ.name
-                                return (
-                                  <div
-                                    key={oIdx}
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      setSelectedSystem(sys.id)
-                                      setSelectedOrgan(organ)
-                                    }}
-                                    className={`px-2 py-1.5 rounded-lg text-[11px] cursor-pointer transition-all flex items-center justify-between ${
-                                      isOrganCur
-                                        ? 'bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30'
-                                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-                                    }`}
-                                  >
-                                    <div className="truncate pr-1">
-                                      <div className="truncate">{organ.name}</div>
-                                      <div className="text-[9px] font-mono italic text-slate-500 truncate">
-                                        {organ.latin}
-                                      </div>
-                                    </div>
-                                    <ChevronRight className={`w-3 h-3 shrink-0 ${isOrganCur ? 'text-rose-400' : 'text-slate-600'}`} />
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  {/* Panel Footer Guide Note */}
-                  <div className="p-2.5 bg-slate-950/90 border-t border-slate-800 text-[10px] text-slate-400 flex items-center justify-between">
-                    <span>💡 Nhấn cơ quan để xem lâm sàng</span>
-                    <span className="text-rose-400 font-bold">9 Hệ Cơ Quan</span>
-                  </div>
-                </div>
-              ) : (
-                /* Collapsed Pill Button on Canvas */
-                <button
-                  onClick={() => setIsVnMenuOpen(true)}
-                  className="absolute top-14 left-3 z-20 flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-white text-xs font-bold border border-slate-700/80 shadow-2xl backdrop-blur-md transition-all hover:scale-105"
-                  title="Mở Bảng Điều Khiển Hệ Cơ Quan Tiếng Việt"
-                >
-                  <Layers className="w-4 h-4 text-rose-400" />
-                  <span>Hệ Cơ Quan (Tiếng Việt)</span>
-                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                </button>
-              )}
-
-              {/* Quick Floating Drawer in Fullscreen 3D mode */}
-              {viewMode === 'fullscreen_3d' && selectedOrgan && (
-                <div className="absolute bottom-3 left-3 right-3 sm:right-auto sm:max-w-md z-20 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-2xl p-4 shadow-2xl">
-                  <div className="flex items-start justify-between gap-2 mb-1.5">
-                    <div>
-                      <h4 className="font-bold text-sm text-rose-300">{selectedOrgan.name}</h4>
-                      <p className="text-[11px] text-slate-400 font-mono">
-                        {selectedOrgan.latin} • {selectedOrgan.english}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setSelectedOrgan(null)}
-                      className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                  <p className="text-xs text-slate-300 line-clamp-2 mb-2 leading-relaxed">
-                    {selectedOrgan.clinical}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleAddToFlashcard(selectedOrgan)}
-                      className="px-2.5 py-1 rounded-lg bg-purple-600/30 hover:bg-purple-600/40 text-purple-300 text-xs font-semibold border border-purple-500/30 flex items-center gap-1"
-                    >
-                      <Sparkles className="w-3 h-3" />
-                      <span>Thêm Flashcard</span>
-                    </button>
-                    <button
-                      onClick={() => setViewMode('split')}
-                      className="px-2.5 py-1 rounded-lg bg-blue-600/30 hover:bg-blue-600/40 text-blue-300 text-xs font-semibold border border-blue-500/30"
-                    >
-                      Xem Chi Tiết Đầy Đủ
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         )}
 
         {/* Vietnamese Medical Handbook & Search Panel */}
-        {viewMode !== 'guide_only' && (
+        {viewMode !== 'fullscreen_3d' && (
           <div className={`${viewMode === 'split' ? 'lg:col-span-5 xl:col-span-5' : 'w-full max-w-5xl mx-auto'}`}>
             <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 shadow-2xl space-y-5 flex flex-col h-[650px] lg:h-[780px]">
               {/* Search Bar */}

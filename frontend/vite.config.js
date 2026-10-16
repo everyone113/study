@@ -19,6 +19,10 @@ export default defineConfig({
       '/drop': {
         target: 'http://localhost:8000',
         changeOrigin: true
+      },
+      '/anatomy-data': {
+        target: 'https://svitylo.com',
+        changeOrigin: true
       }
     }
   }
