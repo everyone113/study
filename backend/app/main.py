@@ -50,8 +50,33 @@ app.mount("/static/processed", StaticFiles(directory=PROCESSED_DIR), name="proce
 app.mount("/static/documents", StaticFiles(directory=DOCUMENTS_DIR), name="documents")
 app.mount("/static/wifidrop", StaticFiles(directory=DROP_DIR), name="wifidrop")
 
-from fastapi.responses import HTMLResponse
+import httpx
+from fastapi.responses import HTMLResponse, Response
+from fastapi import HTTPException
 from app.routes.wifi_drop import get_mobile_drop_html, get_local_ip
+
+@app.get("/api/anatomy-data/{file_path:path}")
+async def proxy_anatomy_data(file_path: str):
+    """High-performance CORS-free proxy for 3D Anatomy Atlas data with automatic decompression."""
+    target_url = f"https://svitylo.com/anatomy-data/{file_path}"
+    try:
+        async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
+            res = await client.get(target_url)
+            if res.status_code != 200:
+                raise HTTPException(status_code=res.status_code, detail=f"Data file not found on remote ({res.status_code})")
+            return Response(
+                content=res.content,
+                status_code=200,
+                media_type=res.headers.get("content-type", "application/octet-stream"),
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Cache-Control": "public, max-age=86400"
+                }
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Proxy error: {str(e)}")
 
 @app.get("/drop", response_class=HTMLResponse)
 async def drop_page():

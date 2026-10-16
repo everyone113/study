@@ -34,10 +34,6 @@
       }
     },
     {
-      "source": "/anatomy-data/(.*)",
-      "destination": "https://svitylo.com/anatomy-data/$1"
-    },
-    {
       "source": "/(.*)",
       "destination": {
         "service": "frontend"
