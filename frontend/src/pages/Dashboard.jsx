@@ -45,8 +45,10 @@ export default function Dashboard({ setCurrentTab }) {
       try {
         const cachedSub = JSON.parse(localStorage.getItem('studymedia_academic_subjects') || '[]')
         const cachedGpa = JSON.parse(localStorage.getItem('studymedia_gpa_summary') || 'null')
+        const cachedNotes = JSON.parse(localStorage.getItem('studymedia_notes') || '[]')
         if (cachedSub.length > 0) setSubjects(cachedSub)
         if (cachedGpa) setGpaSummary(cachedGpa)
+        if (cachedNotes.length > 0) setNotes(cachedNotes)
       } catch (e) {}
     } finally {
       setLoading(false)
@@ -56,19 +58,31 @@ export default function Dashboard({ setCurrentTab }) {
   const handleToggleNote = async (id) => {
     try {
       await axios.put(`/api/notes/${id}/toggle`)
-      fetchDashboardData()
     } catch (err) {
-      console.error(err)
+      console.warn('Dashboard toggle note locally:', err)
     }
+    try {
+      const cached = JSON.parse(localStorage.getItem('studymedia_notes') || '[]')
+      const updated = cached.map(n => n.id === id ? { ...n, is_completed: n.is_completed === 1 ? 0 : 1 } : n)
+      localStorage.setItem('studymedia_notes', JSON.stringify(updated))
+      setNotes(updated)
+    } catch (e) {}
+    fetchDashboardData()
   }
 
   const handleDeleteNote = async (id) => {
     try {
       await axios.delete(`/api/notes/${id}`)
-      fetchDashboardData()
     } catch (err) {
-      console.error(err)
+      console.warn('Dashboard delete note locally:', err)
     }
+    try {
+      const cached = JSON.parse(localStorage.getItem('studymedia_notes') || '[]')
+      const updated = cached.filter(n => n.id !== id)
+      localStorage.setItem('studymedia_notes', JSON.stringify(updated))
+      setNotes(updated)
+    } catch (e) {}
+    fetchDashboardData()
   }
 
   const pendingNotes = notes.filter(n => !n.is_completed)
