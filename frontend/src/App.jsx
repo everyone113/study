@@ -3,6 +3,7 @@ import { AlertCircle, RefreshCw } from 'lucide-react'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 import MobileNav from './components/MobileNav'
+import FloatingDock from './components/FloatingDock'
 
 // Pages
 import Dashboard from './pages/Dashboard'
@@ -80,6 +81,25 @@ export default function App() {
     return 'dashboard'
   })
 
+  // Floating Dock state (default: true for instant interactive experience)
+  const [showDock, setShowDock] = useState(() => {
+    try {
+      const saved = localStorage.getItem('studymedia_show_dock')
+      if (saved !== null) return JSON.parse(saved)
+    } catch (e) {}
+    return true
+  })
+
+  const handleToggleDock = (setter) => {
+    setShowDock(prev => {
+      const next = typeof setter === 'function' ? setter(prev) : setter
+      try {
+        localStorage.setItem('studymedia_show_dock', JSON.stringify(next))
+      } catch (e) {}
+      return next
+    })
+  }
+
   const renderContent = () => {
     switch (currentTab) {
       case 'dashboard':
@@ -117,14 +137,26 @@ export default function App() {
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-w-0">
-          <Header currentTab={currentTab} setCurrentTab={setCurrentTab} />
+          <Header
+            currentTab={currentTab}
+            setCurrentTab={setCurrentTab}
+            showDock={showDock}
+            setShowDock={handleToggleDock}
+          />
 
-          <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full pb-24 md:pb-8">
+          <main className={`flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full ${showDock ? 'pb-28 md:pb-24' : 'pb-24 md:pb-8'}`}>
             {renderContent()}
           </main>
 
-          {/* Mobile Navigation */}
-          <MobileNav currentTab={currentTab} setCurrentTab={setCurrentTab} />
+          {/* Interactive Floating Dock (Apple Dynamic Island & macOS Physics) */}
+          {showDock && (
+            <FloatingDock currentTab={currentTab} setCurrentTab={setCurrentTab} />
+          )}
+
+          {/* Fallback Mobile Navigation when Floating Dock is disabled */}
+          {!showDock && (
+            <MobileNav currentTab={currentTab} setCurrentTab={setCurrentTab} />
+          )}
         </div>
       </div>
     </ErrorBoundary>

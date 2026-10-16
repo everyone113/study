@@ -4,10 +4,11 @@ import {
   Wifi,
   Clock,
   Sparkles,
-  ExternalLink
+  ExternalLink,
+  Compass
 } from 'lucide-react'
 
-export default function Header({ currentTab, setCurrentTab }) {
+export default function Header({ currentTab, setCurrentTab, showDock, setShowDock }) {
   const [timeStr, setTimeStr] = useState('')
 
   useEffect(() => {
@@ -46,6 +47,23 @@ export default function Header({ currentTab, setCurrentTab }) {
       </div>
 
       <div className="flex items-center gap-3">
+        {/* Floating Dock Toggle Button */}
+        {setShowDock && (
+          <button
+            onClick={() => setShowDock(prev => !prev)}
+            title="Bật/Tắt thanh điều hướng Đảo Nổi (Floating Dock)"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+              showDock
+                ? 'bg-blue-600/20 border-blue-500/40 text-blue-400 shadow-sm shadow-blue-500/10'
+                : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Compass className={`w-3.5 h-3.5 ${showDock ? 'animate-spin-slow' : ''}`} />
+            <span className="hidden sm:inline">Đảo Nổi</span>
+            <span className={`w-1.5 h-1.5 rounded-full ${showDock ? 'bg-blue-400' : 'bg-slate-600'}`} />
+          </button>
+        )}
+
         {/* Real-time Clock */}
         <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono text-slate-300">
           <Clock className="w-3.5 h-3.5 text-blue-400" />
