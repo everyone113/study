@@ -120,10 +120,10 @@ export default function MobileConnect({ setCurrentTab }) {
     }
   }
 
-  // Compute active IP and QR target URL
+  // Compute active IP and QR target URL (Direct to ultra-fast 0ms /drop portal)
   const activeIp = selectedIp || networkInfo.local_ip || '192.168.9.55'
-  const activePort = networkInfo.frontend_port || window.location.port || '5173'
-  const qrTargetUrl = `http://${activeIp}:${activePort}/?mode=drop`
+  const activePort = networkInfo.backend_port || '8000'
+  const qrTargetUrl = `http://${activeIp}:${activePort}/drop`
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(qrTargetUrl)
@@ -377,8 +377,17 @@ export default function MobileConnect({ setCurrentTab }) {
                 </a>
               </div>
 
-              <div className="text-[11px] text-slate-400 bg-slate-950/60 p-2 rounded-xl border border-slate-800/80 w-full max-w-sm">
-                💡 <span className="text-slate-300 font-semibold">Nếu quét chậm:</span> Mở Safari hoặc Chrome trên điện thoại, gõ thẳng địa chỉ <strong className="text-amber-300 font-mono">{activeIp}:{activePort}</strong> là vào ngay!
+              <div className="text-[11px] text-slate-400 bg-slate-950/80 p-3 rounded-2xl border border-emerald-500/20 w-full max-w-sm text-center space-y-1">
+                <div className="flex items-center justify-center gap-1.5 text-emerald-400 font-bold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span>Cổng Bắn Ảnh Siêu Tốc (Mở trong 0.05 giây):</span>
+                </div>
+                <div className="text-amber-300 font-mono font-black text-sm select-all tracking-wide">
+                  http://{activeIp}:{activePort}/drop
+                </div>
+                <div className="text-[10px] text-slate-500 pt-1">
+                  Chỉ 10KB • Tải tức thì • Không cần tải ứng dụng nặng
+                </div>
               </div>
             </div>
 

@@ -50,6 +50,16 @@ app.mount("/static/processed", StaticFiles(directory=PROCESSED_DIR), name="proce
 app.mount("/static/documents", StaticFiles(directory=DOCUMENTS_DIR), name="documents")
 app.mount("/static/wifidrop", StaticFiles(directory=DROP_DIR), name="wifidrop")
 
+from fastapi.responses import HTMLResponse
+from app.routes.wifi_drop import get_mobile_drop_html, get_local_ip
+
+@app.get("/drop", response_class=HTMLResponse)
+async def drop_page():
+    """Ultra-fast 0ms standalone mobile photo drop page."""
+    ip = get_local_ip()
+    from app.config import PORT, FRONTEND_PORT
+    return HTMLResponse(get_mobile_drop_html(ip, PORT, FRONTEND_PORT))
+
 @app.get("/api/health")
 async def health_check():
     return {

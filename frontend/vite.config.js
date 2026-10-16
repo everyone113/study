@@ -15,6 +15,10 @@ export default defineConfig({
       '/static': {
         target: 'http://localhost:8000',
         changeOrigin: true
+      },
+      '/drop': {
+        target: 'http://localhost:8000',
+        changeOrigin: true
       }
     }
   }
