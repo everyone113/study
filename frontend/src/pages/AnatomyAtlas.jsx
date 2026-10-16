@@ -17,61 +17,239 @@ import {
   Stethoscope,
   X,
   ChevronRight,
+  ChevronDown,
   Info,
   Compass,
-  Eye
+  Eye,
+  EyeOff,
+  Bone,
+  Filter
 } from 'lucide-react'
 
-// Comprehensive Vietnamese Medical Anatomy Database
-const ANATOMY_SYSTEMS = [
+// Bộ Cơ Sở Dữ Liệu Giải Phẫu Y Khoa Toàn Diện (Bilingual VN - Latin - EN)
+// Chuẩn hóa theo 9 Hệ Cơ Quan trong Atlas 3D
+export const ANATOMY_SYSTEMS = [
+  {
+    id: 'regions',
+    name: 'Các Vùng Cơ Thể Người',
+    latin: 'Partes corporis humani',
+    english: 'Regions of human body',
+    icon: 'Compass',
+    color: '#38bdf8',
+    count: '8 vùng',
+    description: 'Phân chia cơ thể người theo các vùng không gian giải phẫu định khu phục vụ thăm khám lâm sàng và phẫu thuật.',
+    organs: [
+      {
+        name: 'Vùng Đầu & Cổ',
+        latin: 'Caput et Collum',
+        english: 'Head and Neck',
+        location: 'Phần trên cùng cơ thể',
+        clinical: 'Chứa não bộ, các giác quan (mắt, tai, mũi, miệng) và các bó mạch cảnh, dây thần kinh sọ. Tam giác cổ là mốc quan trọng trong phẫu thuật tuyến giáp và mở khí quản.',
+        keyStructures: ['Vòm sọ (Calvaria)', 'Hốc mắt (Orbita)', 'Ổ miệng & Hầu', 'Tam giác cảnh (Carotid triangle)', 'Hố trên đòn']
+      },
+      {
+        name: 'Lồng Ngực & Trung Thất',
+        latin: 'Thorax & Mediastinum',
+        english: 'Thoracic Cage & Mediastinum',
+        location: 'Giữa cổ và cơ hoành',
+        clinical: 'Bao bọc tim, phổi, thực quản và khí quản. Trung thất trước, giữa, sau là vị trí thường gặp của u tuyến ức, u hạch hoặc phình động mạch chủ ngực.',
+        keyStructures: ['Thành ngực trước (Xương ức & Sụn sườn)', 'Khoang màng phổi (Cavitas pleuralis)', 'Trung thất giữa (Chứa tim)', 'Trung thất sau (Thực quản, ĐMC ngực)']
+      },
+      {
+        name: 'Vùng Bụng & 9 Phân Khu',
+        latin: 'Abdomen (Regiones abdominales)',
+        english: 'Abdomen & 9 Regions',
+        location: 'Giữa cơ hoành và đường liên gai chậu trước trên',
+        clinical: 'Phân chia 9 vùng: Thượng vị (dạ dày, tụy), Hạ sườn phải (gan, mật), Hố chậu phải (ruột thừa, manh tràng). Giúp định vị cơ quan đau cấp cứu bụng ngoại khoa.',
+        keyStructures: ['Vùng thượng vị (Epigastrium)', 'Hạ sườn phải & trái (Hypochondrium)', 'Vùng quanh rốn (Umbilical)', 'Hố chậu phải (Điểm McBurney ruột thừa)']
+      },
+      {
+        name: 'Vùng Chậu Hông & Đáy Chậu',
+        latin: 'Pelvis & Perineum',
+        english: 'Pelvis & Perineum',
+        location: 'Dưới hốc bụng, giới hạn bởi khung chậu',
+        clinical: 'Chứa bàng quang, trực tràng, cơ quan sinh dục trong. Đáy chậu có hoành niệu dục và hoành chậu hông, dễ tổn thương rách khi sinh đẻ.',
+        keyStructures: ['Chậu hông bé (True pelvis)', 'Hoành chậu hông (Cơ nâng hậu môn)', 'Tam giác niệu dục', 'Trực tràng & Bàng quang']
+      },
+      {
+        name: 'Vùng Lưng & Cột Sống',
+        latin: 'Dorsum & Columna vertebralis',
+        english: 'Back & Vertebral Region',
+        location: 'Mặt sau thân mình',
+        clinical: 'Bảo vệ tủy sống. Rãnh sống hai bên chứa cơ dựng sống. Tam giác thắt lưng Petit là điểm yếu thành bụng sau có thể xảy ra thoát vị.',
+        keyStructures: ['Đường giữa gai sống', 'Vùng bả vai (Regio scapularis)', 'Tam giác thắt lưng (Lumbar triangle)', 'Vùng cùng cụt']
+      },
+      {
+        name: 'Chi Trên (Nách, Cánh tay, Bàn tay)',
+        latin: 'Membrum superius',
+        english: 'Upper Limb',
+        location: 'Khớp vai đến các đầu ngón tay',
+        clinical: 'Hõm nách chứa đám rối thần kinh cánh tay và bó mạch nách. Hõm lào giải phẫu vùng cổ tay liên quan gãy xương thuyền. Hội chứng ống cổ tay chèn ép thần kinh giữa.',
+        keyStructures: ['Hố nách (Axilla)', 'Rãnh nhị đầu trong và ngoài', 'Hố khuỷu (Cubital fossa)', 'Ống cổ tay (Carpal tunnel)', 'Gan tay & Mu tay']
+      },
+      {
+        name: 'Chi Dưới (Mông, Đùi, Bàn chân)',
+        latin: 'Membrum inferius',
+        english: 'Lower Limb',
+        location: 'Khớp háng đến các ngón chân',
+        clinical: 'Tam giác đùi Scarpa chứa động mạch, tĩnh mạch và thần kinh đùi (vị trí chọc dò mạch máu can thiệp tim mạch). Hố khoeo sau gối chứa bó mạch khoeo.',
+        keyStructures: ['Vùng mông (Regio glutealis - vị trí tiêm bắp an toàn 1/4 trên ngoài)', 'Tam giác đùi (Femoral triangle)', 'Hố khoeo (Popliteal fossa)', 'Mắt cá trong & Mắt cá ngoài']
+      }
+    ]
+  },
+  {
+    id: 'muscular',
+    name: 'Hệ Cơ Bắp',
+    latin: 'Systema musculare',
+    english: 'Muscular system',
+    icon: 'Activity',
+    color: '#ef4444',
+    count: '600+ cơ',
+    description: 'Hơn 600 cơ vân tạo lực vận động, duy trì tư thế, sinh nhiệt và hỗ trợ tuần hoàn tĩnh mạch trở về tim.',
+    organs: [
+      {
+        name: 'Cơ Vùng Đầu & Mặt (Cơ Biểu Cảm & Cơ Nhai)',
+        latin: 'Musculi capitis & faciei',
+        english: 'Facial & Masticatory Muscles',
+        location: 'Vùng đầu mặt',
+        clinical: 'Cơ bám da mặt do Dây TK VII chi phối (liệt mặt ngoại biên Bell gây méo miệng, mắt nhắm không kín). Cơ cắn và cơ thái dương do Dây TK V3 chi phối tạo lực nghiền nhai thức ăn.',
+        keyStructures: ['Cơ cắn (Masseter - cơ khỏe nhất theo tỷ lệ)', 'Cơ thái dương (Temporalis)', 'Cơ vòng mắt (Orbicularis oculi)', 'Cơ vòng miệng (Orbicularis oris)', 'Cơ mút (Buccinator)']
+      },
+      {
+        name: 'Cơ Vùng Cổ (Cơ Ức Đòn Chũm & Dưới Móng)',
+        latin: 'Musculi colli',
+        english: 'Neck Muscles',
+        location: 'Vùng cổ trước và bên',
+        clinical: 'Cơ ức đòn chũm (SCM) co một bên làm nghiêng đầu về cùng bên và quay mặt sang đối diện (tật vẹo cổ bẩm sinh Torticollis). Chia cổ thành tam giác cổ trước và sau.',
+        keyStructures: ['Cơ ức đòn chũm (Sternocleidomastoid)', 'Cơ bậc thang trước, giữa, sau (Scalene)', 'Cơ vai móng & ức móng', 'Cơ bám da cổ (Platysma)']
+      },
+      {
+        name: 'Cơ Lồng Ngực & Cơ Hoành Hô Hấp',
+        latin: 'Musculi thoracis & Diaphragma',
+        english: 'Thoracic Muscles & Diaphragm',
+        location: 'Lồng ngực và ngăn cách ngực - bụng',
+        clinical: 'Cơ hoành là cơ hô hấp chính, do dây thần kinh hoành (C3-C5) chi phối. Thoát vị hoành làm các tạng bụng chui lên lồng ngực ép tim phổi. Cơ ngực lớn tạo hình thành ngực trước.',
+        keyStructures: ['Cơ hoành (Diaphragm - 3 lỗ: ĐMC, Tĩnh mạch chủ, Thực quản)', 'Cơ ngực lớn (Pectoralis major)', 'Cơ ngực bé', 'Cơ liên sườn ngoài & trong (Hít vào & thở ra gắng sức)']
+      },
+      {
+        name: 'Cơ Thành Bụng (Cơ Thẳng & Cơ Chéo)',
+        latin: 'Musculi abdominis',
+        english: 'Abdominal Wall Muscles',
+        location: 'Mặt trước và hai bên ổ bụng',
+        clinical: 'Tạo áp lực ổ bụng khi thở ra, rặn đẻ, đại tiện. Đường trắng giữa (Linea alba) là đường mổ bụng kinh điển ít chảy máu. Ống bẹn là nơi xảy ra thoát vị bẹn thường gặp.',
+        keyStructures: ['Cơ thẳng bụng (Rectus abdominis - 6 múi)', 'Cơ chéo bụng ngoài & trong', 'Cơ ngang bụng (Transversus abdominis)', 'Ống bẹn (Inguinal canal)']
+      },
+      {
+        name: 'Cơ Vùng Lưng & Gáy',
+        latin: 'Musculi dorsi',
+        english: 'Back Muscles',
+        location: 'Mặt sau thân mình',
+        clinical: 'Cơ thang nâng vai và ngửa đầu. Cơ lưng rộng kéo cánh tay ra sau. Khối cơ dựng sống giữ cột sống thẳng đứng, dễ bị co cứng gây đau thắt lưng cơ năng.',
+        keyStructures: ['Cơ thang (Trapezius)', 'Cơ lưng rộng (Latissimus dorsi)', 'Cơ dựng sống (Erector spinae)', 'Cơ trám lớn & bé']
+      },
+      {
+        name: 'Cơ Chi Trên (Cơ Delta & Cơ Cánh Tay)',
+        latin: 'Musculi membri superioris',
+        english: 'Upper Limb Muscles',
+        location: 'Vai, cánh tay, cẳng tay và bàn tay',
+        clinical: 'Cơ delta là nơi tiêm bắp an toàn phổ biến. Cơ nhị đầu cánh tay gấp cẳng tay (dây TK cơ bì). Cơ tam đầu duỗi cẳng tay (dây TK quay). Rách chóp xoay vai gây hạn chế giang tay.',
+        keyStructures: ['Cơ delta (Deltoid)', 'Cơ nhị đầu cánh tay (Biceps brachii)', 'Cơ tam đầu cánh tay (Triceps brachii)', 'Chóp xoay (Rotator cuff: Trên gai, dưới gai, tròn bé, dưới vai)']
+      },
+      {
+        name: 'Cơ Chi Dưới (Cơ Mông & Đùi)',
+        latin: 'Musculi membri inferioris',
+        english: 'Lower Limb Muscles',
+        location: 'Khung chậu, đùi, cẳng chân',
+        clinical: 'Cơ mông lớn giúp duỗi háng khi leo cầu thang. Cơ tứ đầu đùi duỗi gối (phản xạ gân bánh chè L3-L4). Gân gót Achilles là gân to nhất cơ thể, dễ đứt khi vận động mạnh đột ngột.',
+        keyStructures: ['Cơ mông lớn (Gluteus maximus)', 'Cơ tứ đầu đùi (Quadriceps femoris)', 'Cơ may (Sartorius - cơ dài nhất cơ thể)', 'Cơ tam đầu cẳng chân & Gân Achilles']
+      }
+    ]
+  },
   {
     id: 'skeletal',
-    name: 'Hệ Xương & Khớp',
+    name: 'Hệ Xương',
     latin: 'Systema skeletale',
-    english: 'Skeletal System',
+    english: 'Skeletal system',
     icon: 'Bone',
     color: '#f59e0b',
-    description: 'Bộ khung nâng đỡ cơ thể gồm 206 xương, bảo vệ các tạng và là điểm bám của các cơ.',
+    count: '206 xương',
+    description: 'Bộ khung nâng đỡ cơ thể gồm 206 xương, bảo vệ các tạng trọng yếu và là kho dự trữ canxi của cơ thể.',
     organs: [
       {
         name: 'Hộp Sọ & Khối Xương Mặt',
         latin: 'Cranium & Ossa faciei',
         english: 'Skull & Facial Bones',
         location: 'Vùng đầu',
-        clinical: 'Bảo vệ não bộ và các giác quan. Chấn thương sọ não (TBI) cần lưu ý điểm yếu Pterion (nơi có động mạch màng não giữa đi qua).',
-        keyStructures: ['Xương trán (Frontal bone)', 'Xương đỉnh (Parietal bone)', 'Xương thái dương (Temporal bone)', 'Xương chẩm (Occipital bone)', 'Xương hàm dưới (Mandible)']
+        clinical: 'Bảo vệ não bộ và các giác quan. Chấn thương sọ não (TBI) cần lưu ý điểm yếu Pterion (nơi có động mạch màng não giữa đi qua gây máu tụ ngoài màng cứng).',
+        keyStructures: ['Xương trán (Frontal bone)', 'Xương đỉnh (Parietal bone)', 'Xương thái dương (Temporal bone)', 'Xương chẩm (Occipital bone)', 'Xương bướm (Sphenoid)', 'Xương hàm dưới (Mandible)']
       },
       {
         name: 'Cột Sống (33-34 đốt sống)',
         latin: 'Columna vertebralis',
         english: 'Vertebral Column',
         location: 'Trục giữa lưng',
-        clinical: 'Chứa tủy sống. Gồm 7 đốt sống cổ (C1-C7, C1 gọi là đốt Atlas, C2 là Axis), 12 đốt ngực (T1-T12), 5 đốt thắt lưng (L1-L5), 5 đốt cùng (S1-S5) và 4-5 đốt cụt. Thường gặp thoát vị đĩa đệm vùng L4-L5, L5-S1.',
-        keyStructures: ['Đốt đội C1 (Atlas)', 'Đốt trục C2 (Axis)', 'Đốt sống thắt lưng L1-L5', 'Xương cùng (Sacrum)', 'Đĩa đệm gian đốt sống']
+        clinical: 'Chứa tủy sống. Gồm 7 đốt sống cổ (C1 Atlas, C2 Axis), 12 đốt ngực (T1-T12), 5 đốt thắt lưng (L1-L5), 5 đốt cùng (S1-S5) và xương cụt. Thoát vị đĩa đệm hay gặp nhất ở L4-L5 và L5-S1 chèn ép dây TK tọa.',
+        keyStructures: ['Đốt đội C1 (Atlas)', 'Đốt trục C2 (Axis)', 'Đốt sống thắt lưng L1-L5', 'Xương cùng (Sacrum)', 'Đĩa đệm gian đốt sống (Intervertebral disc)']
       },
       {
         name: 'Lồng Ngực & Xương Sườn',
         latin: 'Thorax & Costae',
         english: 'Thoracic Cage & Ribs',
         location: 'Vùng ngực',
-        clinical: 'Gồm xương ức và 12 đôi xương sườn (7 sườn thật nối trực tiếp xương ức, 3 sườn giả nối qua sụn sườn 7, 2 sườn cụt lơ lửng). Bảo vệ tim và 2 lá phổi.',
-        keyStructures: ['Cán xương ức (Manubrium)', 'Thân xương ức (Body of sternum)', 'Mũi kiếm (Xiphoid process)', 'Góc ức Louis (mốc đếm khoang liên sườn 2)']
+        clinical: 'Gồm xương ức và 12 đôi xương sườn (7 sườn thật, 3 sườn giả, 2 sườn cụt lơ lửng). Góc ức Louis là mốc đếm khoang liên sườn 2 khi nghe tim và chọc dò tràn khí màng phổi.',
+        keyStructures: ['Cán xương ức (Manubrium)', 'Góc ức Louis (Sternal angle)', 'Thân xương ức (Body of sternum)', 'Mũi kiếm (Xiphoid process)', '12 đôi xương sườn']
       },
       {
-        name: 'Chi Trên & Đai Vai',
-        latin: 'Membrum superius',
-        english: 'Upper Limb & Pectoral Girdle',
-        location: 'Tay và khớp vai',
-        clinical: 'Xương đòn là xương hay bị gãy nhất trong chấn thương. Khớp vai là khớp có biên độ vận động lớn nhất cơ thể nên dễ trật khớp nhất.',
-        keyStructures: ['Xương đòn (Clavicle)', 'Xương bả vai (Scapula)', 'Xương cánh tay (Humerus)', 'Xương quay (Radius)', 'Xương trụ (Ulna)']
+        name: 'Đai Vai & Xương Chi Trên',
+        latin: 'Cingulum pectorale & Membrum superius',
+        english: 'Pectoral Girdle & Upper Limb Bones',
+        location: 'Vai, cánh tay, cẳng tay và bàn tay',
+        clinical: 'Xương đòn là xương hay bị gãy nhất trong chấn thương té ngã chống tay. Khớp vai dễ trật ra trước. Đầu dưới xương quay gãy Pouteau-Colles tạo hình dạng "cái thìa bạt".',
+        keyStructures: ['Xương đòn (Clavicle)', 'Xương bả vai (Scapula)', 'Xương cánh tay (Humerus)', 'Xương quay (Radius)', 'Xương trụ (Ulna)', '8 xương cổ tay']
       },
       {
-        name: 'Chi Dưới & Khung Chậu',
-        latin: 'Membrum inferius & Pelvis',
-        english: 'Lower Limb & Pelvis',
+        name: 'Đai Chậu & Xương Chi Dưới',
+        latin: 'Pelvis & Membrum inferius',
+        english: 'Pelvic Girdle & Lower Limb Bones',
         location: 'Khung chậu và chân',
-        clinical: 'Xương đùi là xương dài và chắc nhất cơ thể. Gãy cổ xương đùi thường gặp ở người cao tuổi loãng xương. Khớp gối có dây chằng chéo trước (ACL) và sụn chêm hay tổn thương khi chơi thể thao.',
-        keyStructures: ['Xương chậu (Hip bone)', 'Xương đùi (Femur)', 'Xương bánh chè (Patella)', 'Xương chày (Tibia)', 'Xương mác (Fibula)']
+        clinical: 'Xương đùi là xương dài và chịu lực lớn nhất cơ thể. Gãy cổ xương đùi ở người cao tuổi loãng xương dễ hoại tử chỏm xương đùi do đứt nhánh mạch mũ.',
+        keyStructures: ['Xương chậu (Xương cánh chậu, mu, ngồi)', 'Xương đùi (Femur & Cổ xương đùi)', 'Xương bánh chè (Patella)', 'Xương chày (Tibia)', 'Xương mác (Fibula)', 'Xương gót & sên']
+      }
+    ]
+  },
+  {
+    id: 'joints',
+    name: 'Khớp & Dây Chằng',
+    latin: 'Systema articulare',
+    english: 'Joints',
+    icon: 'Layers',
+    color: '#14b8a6',
+    count: '3 loại khớp',
+    description: 'Hệ thống liên kết xương gồm khớp hoạt dịch (cử động linh hoạt), khớp sụn (bán động) và khớp sợi (bất động).',
+    organs: [
+      {
+        name: 'Khớp Hoạt Dịch Biên Độ Rộng (Khớp Vai & Khớp Háng)',
+        latin: 'Articulatio humeri & coxae',
+        english: 'Shoulder & Hip Ball-and-Socket Joints',
+        location: 'Đai vai và khung chậu',
+        clinical: 'Khớp vai có ổ chảo nông nên dễ trật khớp nhất. Khớp háng là khớp chịu tải lớn nhất cơ thể, có sụn viền ổ cối và dây chằng chỏm đùi.',
+        keyStructures: ['Ổ chảo xương bả vai (Glenoid cavity)', 'Sụn viền ổ chảo', 'Ổ cối xương chậu (Acetabulum)', 'Dây chằng chỏm xương đùi']
+      },
+      {
+        name: 'Khớp Phức Hợp (Khớp Gối & Khớp Cổ Chân)',
+        latin: 'Articulatio genus & talocruralis',
+        english: 'Knee & Ankle Complex Joints',
+        location: 'Giữa đùi và cẳng chân, cẳng chân và bàn chân',
+        clinical: 'Dây chằng chéo trước (ACL) ngăn mâm chày trượt ra trước (dấu hiệu ngăn kéo trước dương tính khi đứt ACL). Sụn chêm trong hình chữ C dễ rách hơn sụn chêm ngoài hình chữ O.',
+        keyStructures: ['Dây chằng chéo trước (ACL)', 'Dây chằng chéo sau (PCL)', 'Sụn chêm trong & ngoài (Meniscus)', 'Dây chằng bên chày & bên mác (MCL & LCL)']
+      },
+      {
+        name: 'Khớp Bản Lề & Khớp Trục (Khớp Khuỷu & Cột Sống)',
+        latin: 'Articulatio cubiti & articulatio atlantoaxialis',
+        english: 'Elbow Hinge Joint & Atlantoaxial Pivot Joint',
+        location: 'Khuỷu tay và khớp đội trục cổ',
+        clinical: 'Khớp C1-C2 (Atlas-Axis) giúp đầu quay trái phải quanh mỏm nha. Trật khớp C1-C2 chèn ép hành não đe dọa ngừng thở ngay lập tức.',
+        keyStructures: ['Mỏm nha xương trục (Dens of Axis)', 'Dây chằng ngang đốt đội', 'Khớp cánh tay - trụ (Gấp duỗi khuỷu)', 'Khớp quay - trụ gần (Sấp ngửa)']
       }
     ]
   },
@@ -79,158 +257,187 @@ const ANATOMY_SYSTEMS = [
     id: 'cardiovascular',
     name: 'Hệ Tim Mạch & Tuần Hoàn',
     latin: 'Systema cardiovasculare',
-    english: 'Cardiovascular System',
+    english: 'Cardiovascular system',
     icon: 'HeartPulse',
-    color: '#ef4444',
-    description: 'Hệ thống bơm và vận chuyển oxy, chất dinh dưỡng qua tim, động mạch và tĩnh mạch đến tế bào.',
+    color: '#e11d48',
+    count: 'Tim & Mạch máu',
+    description: 'Bơm tim và mạng lưới động mạch, tĩnh mạch vận chuyển oxy, dưỡng chất và hormone đi nuôi toàn cơ thể.',
     organs: [
       {
-        name: 'Quả Tim (4 buồng & 4 van)',
-        latin: 'Cor',
-        english: 'Heart',
+        name: 'Quả Tim (4 Buồng & 4 Bộ Van)',
+        latin: 'Cor (Atria & Ventriculi)',
+        english: 'Heart & Cardiac Valves',
         location: 'Trung thất giữa lồng ngực, lệch sang trái',
-        clinical: 'Nặng khoảng 250-300g. 2 tâm nhĩ (hút máu về), 2 tâm thất (bơm máu đi). Van 3 lá (nhĩ-thất phải), van 2 lá (nhĩ-thất trái). Nhồi máu cơ tim do tắc động mạch vành.',
-        keyStructures: ['Tâm thất trái (Left ventricle - thành dày nhất)', 'Tâm thất phải', 'Tâm nhĩ trái & phải', 'Van 2 lá (Mitral valve)', 'Động mạch vành (Coronary artery)']
+        clinical: 'Tâm thất trái thành dày nhất (12-15mm) để bơm máu nuôi toàn thân. Hẹp hở van 2 lá hoặc van động mạch chủ gây suy tim. Nhồi máu cơ tim cấp do tắc nhánh ĐM vành LAD.',
+        keyStructures: ['Tâm thất trái (Left ventricle)', 'Tâm nhĩ phải & trái', 'Van 2 lá (Mitral valve)', 'Van 3 lá (Tricuspid)', 'Động mạch vành trái & phải']
       },
       {
-        name: 'Cung Động Mạch Chủ',
-        latin: 'Arcus aortae',
-        english: 'Aortic Arch',
-        location: 'Xuất phát từ tâm thất trái uốn cong lên trên',
-        clinical: 'Động mạch lớn nhất cơ thể, chịu áp lực máu cao nhất (huyết áp tâm thu). Cho ra 3 nhánh chính cấp máu lên đầu và tay: Thân tay đầu, Động mạch cảnh chung trái, Động mạch dưới đòn trái.',
-        keyStructures: ['Động mạch chủ lên', 'Cung động mạch chủ', 'Động mạch cảnh chung (Carotid)', 'Động mạch chủ ngực & bụng']
+        name: 'Cung Động Mạch Chủ & Nhánh Nuôi Não',
+        latin: 'Arcus aortae & Arteriae carotides',
+        english: 'Aortic Arch & Carotid Arteries',
+        location: 'Xuất phát từ tâm thất trái uốn cong lên nền cổ',
+        clinical: '3 nhánh chính: Thân tay đầu, ĐM cảnh chung trái, ĐM dưới đòn trái. Phình tách thành động mạch chủ (Aortic dissection) là cấp cứu tử vong rất cao.',
+        keyStructures: ['Động mạch chủ lên (Ascending aorta)', 'Cung động mạch chủ', 'Động mạch cảnh chung (Carotid)', 'Động mạch dưới đòn']
       },
       {
-        name: 'Hệ Tĩnh Mạch Chủ & Tĩnh Mạch Cửa',
-        latin: 'Vena cava & Vena portae',
-        english: 'Vena Cava & Portal Vein',
+        name: 'Hệ Tĩnh Mạch Chủ & Tĩnh Mạch Cửa Gan',
+        latin: 'Vena cava & Vena portae hepatis',
+        english: 'Vena Cava & Portal Vein System',
         location: 'Dọc ổ bụng và ngực đổ về tâm nhĩ phải',
-        clinical: 'Tĩnh mạch chủ trên (SVC) gom máu nửa trên cơ thể, tĩnh mạch chủ dưới (IVC) gom máu nửa dưới. Tĩnh mạch cửa đưa máu từ ống tiêu hóa về gan lọc độc tố trước khi vào tuần hoàn chung.',
-        keyStructures: ['Tĩnh mạch chủ trên (SVC)', 'Tĩnh mạch chủ dưới (IVC)', 'Tĩnh mạch cửa gan (Portal vein)', 'Tĩnh mạch cảnh trong']
+        clinical: 'Tĩnh mạch cửa gom máu từ toàn bộ ruột non, dạ dày về gan khử độc. Xơ gan làm tăng áp lực tĩnh mạch cửa gây giãn vỡ tĩnh mạch thực quản xuất huyết tiêu hóa ồ ạt.',
+        keyStructures: ['Tĩnh mạch chủ trên (SVC)', 'Tĩnh mạch chủ dưới (IVC)', 'Tĩnh mạch cửa gan (Portal vein)', 'Vòng nối gánh - chủ quanh thực quản và rốn']
+      }
+    ]
+  },
+  {
+    id: 'visceral',
+    name: 'Hệ Nội Tạng',
+    latin: 'Systemata visceralia',
+    english: 'Visceral systems',
+    icon: 'Activity',
+    color: '#10b981',
+    count: 'Hô hấp, Tiêu hóa, Tiết niệu',
+    description: 'Các cơ quan tạng đảm nhận các chức năng sống: trao đổi khí (hô hấp), chuyển hóa dinh dưỡng (tiêu hóa), bài tiết và lọc máu (tiết niệu).',
+    organs: [
+      {
+        name: 'Hệ Hô Hấp: Hai Lá Phổi & Khí Quản',
+        latin: 'Pulmones & Trachea',
+        english: 'Lungs & Tracheobronchial Tree',
+        location: 'Khoang lồng ngực hai bên trung thất',
+        clinical: 'Phổi phải có 3 thùy, phổi trái có 2 thùy và có khuyết tim. Dị vật đường thở thường rơi vào phế quản chính bên phải vì to hơn, dốc hơn và thẳng góc hơn.',
+        keyStructures: ['Phổi phải (Thùy trên, giữa, dưới)', 'Phổi trái (Thùy trên, dưới)', 'Khí quản (Trachea - 16-20 vòng sụn)', 'Phế quản chính phải & trái', 'Cựa phế quản (Carina)']
+      },
+      {
+        name: 'Hệ Tiêu Hóa: Dạ Dày, Gan & Mật',
+        latin: 'Gaster, Hepar & Vesica biliaris',
+        english: 'Stomach, Liver & Gallbladder',
+        location: 'Tầng trên mạc treo đại tràng ngang',
+        clinical: 'Gan chia 8 phân thùy theo Couinaud dựa trên phân nhánh tĩnh mạch cửa. Điểm túi mật Murphy đau khi viêm túi mật cấp. Loét dạ dày hay gặp ở bờ cong nhỏ do Helicobacter pylori.',
+        keyStructures: ['Dạ dày (Tâm vị, đáy vị, thân vị, môn vị)', 'Gan (8 hạ phân thùy Couinaud)', 'Túi mật & Ống mật chủ', 'Tụy (Đầu, thân, đuôi tụy)']
+      },
+      {
+        name: 'Hệ Tiêu Hóa: Ruột Non, Ruột Già & Ruột Thừa',
+        latin: 'Intestinum tenue & Intestinum crassum',
+        english: 'Small & Large Intestine, Appendix',
+        location: 'Toàn bộ khoang bụng dưới gan và dạ dày',
+        clinical: 'Ruột non dài 6m là nơi hấp thu dưỡng chất chủ yếu. Ruột thừa xuất phát từ đáy manh tràng, viêm ruột thừa cấp gây đau hố chậu phải (điểm McBurney) cần mổ sớm.',
+        keyStructures: ['Tá tràng (Duodenum - Khung tá tụy)', 'Hỗng tràng & Hồi tràng', 'Manh tràng & Ruột thừa (Appendix)', 'Đại tràng lên, ngang, xuống, sigma', 'Trực tràng & Hậu môn']
+      },
+      {
+        name: 'Hệ Tiết Niệu: Thận & Bàng Quang',
+        latin: 'Renes & Vesica urinaria',
+        english: 'Kidneys, Ureters & Bladder',
+        location: 'Sau phúc mạc hai bên cột sống thắt lưng',
+        clinical: 'Mỗi thận chứa 1 triệu Nephron lọc 180 lít huyết tương/ngày. Niệu quản có 3 chỗ hẹp sinh lý (nối bể thận, vắt qua bó mạch chậu, cắm bàng quang) là nơi sỏi dễ kẹt nhất.',
+        keyStructures: ['Vỏ thận & Tủy thận', 'Bể thận (Renal pelvis)', 'Niệu quản (3 chỗ hẹp)', 'Bàng quang (Tam giác bàng quang Lieutaud)', 'Niệu đạo']
       }
     ]
   },
   {
     id: 'nervous',
-    name: 'Hệ Thần Kinh',
-    latin: 'Systema nervosum',
-    english: 'Nervous System',
+    name: 'Hệ Thần Kinh & Giác Quan',
+    latin: 'Systema nervosum & Organa sensuum',
+    english: 'Nervous system & Sense organs',
     icon: 'Brain',
     color: '#8b5cf6',
-    description: 'Hệ thống điều khiển trung ương và ngoại vi, xử lý tín hiệu cảm giác và vận động.',
+    count: 'TKTW & 12 Đôi Dây Sọ',
+    description: 'Hệ thống điều khiển tối cao, xử lý nhận thức, phản xạ, vận động và tiếp nhận kích thích môi trường thông qua ngũ quan.',
     organs: [
       {
-        name: 'Đại Não & Vỏ Não',
-        latin: 'Cerebrum',
-        english: 'Cerebrum',
+        name: 'Đại Não & Vỏ Não 4 Thùy',
+        latin: 'Cerebrum (Cortex cerebri)',
+        english: 'Cerebrum & Cerebral Cortex',
         location: 'Hộp sọ tầng trên',
-        clinical: 'Chia 2 bán cầu não (nối nhau qua thể chai) và 4 thùy: Thùy trán (tư duy, vận động), Thùy đỉnh (cảm giác), Thùy thái dương (nghe, trí nhớ), Thùy chẩm (thị giác). Đột quỵ thường do nhồi máu hoặc xuất huyết não.',
-        keyStructures: ['Thùy trán (Frontal lobe)', 'Thùy thái dương (Temporal lobe)', 'Thùy chẩm (Occipital lobe)', 'Vùng Broca & Wernicke (Ngôn ngữ)']
+        clinical: 'Thùy trán (vận động, tính cách), Thùy đỉnh (cảm giác soma), Thùy thái dương (trí nhớ, thính giác), Thùy chẩm (vỏ não thị giác). Vùng Broca điều khiển phát âm, vùng Wernicke hiểu ngôn ngữ.',
+        keyStructures: ['Thùy trán (Frontal lobe)', 'Thùy đỉnh (Parietal lobe)', 'Thùy thái dương (Temporal lobe)', 'Thùy chẩm (Occipital lobe)', 'Thể chai (Corpus callosum)']
       },
       {
-        name: 'Tiểu Não & Thân Não',
+        name: 'Tiểu Não & Thân Não (Trung Tâm Sinh Mệnh)',
         latin: 'Cerebellum & Truncus encephali',
         english: 'Cerebellum & Brainstem',
         location: 'Hố sọ sau',
-        clinical: 'Tiểu não giữ thăng bằng và phối hợp động tác tinh vi. Thân não (Cuống não, Cầu não, Hành não) chứa trung tâm sinh mệnh điều hòa nhịp tim và nhịp thở.',
-        keyStructures: ['Tiểu não (Cerebellum)', 'Cầu não (Pons)', 'Hành não (Medulla oblongata - trung tâm hô hấp)', 'Cuống não']
+        clinical: 'Tiểu não phối hợp thăng bằng. Thân não gồm Cuống não, Cầu não, Hành não. Hành não chứa trung tâm hô hấp và vận mạch, tổn thương tụt kẹt hành não gây ngừng thở tử vong ngay.',
+        keyStructures: ['Tiểu não (Bán cầu tiểu não & Thùy nhộng Vermis)', 'Cuống não (Midbrain)', 'Cầu não (Pons)', 'Hành não (Medulla oblongata)', 'Não thất IV']
       },
       {
-        name: '12 Đôi Dây Thần Kinh Sọ',
-        latin: 'Nervi craniales I-XII',
+        name: '12 Đôi Dây Thần Kinh Sọ (I - XII)',
+        latin: 'Nervi craniales I - XII',
         english: '12 Cranial Nerves',
-        location: 'Xuất phát từ não bộ chui qua các lỗ sọ',
-        clinical: 'Dây VII (dây thần kinh mặt) tổn thương gây liệt mặt ngoại biên (liệt Bell). Dây X (dây mê tẩu/lang thang) chi phối đối giao cảm tim, phổi, tiêu hóa.',
-        keyStructures: ['Dây I: Khứu giác', 'Dây II: Thị giác', 'Dây V: Tam thoa', 'Dây VII: Vận động mặt', 'Dây X: Dây thần kinh lang thang']
+        location: 'Xuất phát từ não chui qua các lỗ nền sọ',
+        clinical: 'Dây III (Vận nhãn - liệt gây sụp mi, giãn đồng tử). Dây VII (Thần kinh mặt - liệt mặt). Dây X (Dây lang thang - chi phối phó giao cảm tim, phổi, tiêu hóa).',
+        keyStructures: ['Dây I (Khứu giác) & II (Thị giác)', 'Dây III, IV, VI (Vận động cơ nhãn cầu)', 'Dây V (Tam thoa - cảm giác mặt & cơ nhai)', 'Dây VII (Mặt)', 'Dây X (Lang thang Vagus)']
+      },
+      {
+        name: 'Cơ Quan Thị Giác & Thính Giác',
+        latin: 'Organum visus & Organum auditus',
+        english: 'Eye & Ear Sense Organs',
+        location: 'Hốc mắt và xương thái dương',
+        clinical: 'Võng mạc chuyển đổi ánh sáng thành tín hiệu thần kinh truyền qua dây II. Ốc tai và tiền đình phụ trách nghe và giữ thăng bằng cơ thể.',
+        keyStructures: ['Nhãn cầu (Giác mạc, Thể thủy tinh, Võng mạc)', 'Thần kinh thị giác (Dây II)', 'Màng nhĩ & Chuỗi xương con (Búa, đe, bàn đạp)', 'Ốc tai & Các ống bán khuyên']
       }
     ]
   },
   {
-    id: 'respiratory',
-    name: 'Hệ Hô Hấp',
-    latin: 'Systema respiratorium',
-    english: 'Respiratory System',
-    icon: 'Activity',
-    color: '#06b6d4',
-    description: 'Trao đổi khí O2 và CO2 giữa môi trường và máu thông qua phổi và đường dẫn khí.',
-    organs: [
-      {
-        name: 'Hai Lá Phổi & Cây Phế Quản',
-        latin: 'Pulmones & Arbor bronchialis',
-        english: 'Lungs & Bronchial Tree',
-        location: 'Khoang lồng ngực 2 bên tim',
-        clinical: 'Phổi phải có 3 thùy (trên, giữa, dưới) ngăn cách bởi khe chếch và khe ngang. Phổi trái có 2 thùy (trên, dưới) và có khuyết tim. Đơn vị trao đổi khí là khoảng 300-500 triệu phế nang.',
-        keyStructures: ['Phổi phải (3 thùy)', 'Phổi trái (2 thùy + khuyết tim)', 'Khí quản (Trachea)', 'Phế quản chính (Carina)', 'Phế nang (Alveoli)']
-      },
-      {
-        name: 'Thanh Quản & Khí Quản',
-        latin: 'Larynx & Trachea',
-        english: 'Larynx & Trachea',
-        location: 'Vùng cổ trước',
-        clinical: 'Thanh quản là cơ quan phát âm, chứa dây thanh âm và sụn nắp thanh môn (Epiglottis - ngăn thức ăn lọt vào đường thở khi nuốt). Khí quản gồm 16-20 vòng sụn chữ C.',
-        keyStructures: ['Sụn giáp (Trái táo Adam)', 'Sụn nắp thanh môn (Epiglottis)', 'Dây thanh âm (Vocal cords)', 'Vòng sụn khí quản']
-      }
-    ]
-  },
-  {
-    id: 'digestive',
-    name: 'Hệ Tiêu Hóa',
-    latin: 'Systema digestorium',
-    english: 'Digestive System',
-    icon: 'Layers',
-    color: '#10b981',
-    description: 'Tiêu hóa thức ăn, hấp thu dưỡng chất và đào thải chất cặn bã.',
-    organs: [
-      {
-        name: 'Dạ Dày (Bao tử)',
-        latin: 'Gaster / Ventriculus',
-        english: 'Stomach',
-        location: 'Hạ sườn trái và vùng thượng vị',
-        clinical: 'Hình chữ J, thể tích 1-1.5 lít. Tiết acid HCl và enzyme Pepsin. Loét dạ dày tá tràng hay xảy ra ở bờ cong nhỏ và hành tá tràng do vi khuẩn Helicobacter pylori.',
-        keyStructures: ['Tâm vị (Cardia)', 'Đáy vị (Fundus)', 'Thân vị (Body)', 'Hang môn vị (Antrum)', 'Cơ thắt môn vị (Pylorus)']
-      },
-      {
-        name: 'Gan & Túi Mật',
-        latin: 'Hepar & Vesica biliaris',
-        english: 'Liver & Gallbladder',
-        location: 'Hạ sườn phải, dưới vòm hoành phải',
-        clinical: 'Tuyến lớn nhất cơ thể (nặng ~1.5kg). Phân chia 8 hạ phân thùy theo Couinaud. Gan sản xuất mật, khử độc, tổng hợp albumin và các yếu tố đông máu. Túi mật dự trữ và cô đặc dịch mật.',
-        keyStructures: ['Thùy gan phải & trái', 'Tĩnh mạch cửa gan', 'Túi mật (Gallbladder)', 'Ống mật chủ (Common bile duct)']
-      },
-      {
-        name: 'Ruột Non, Ruột Già & Ruột Thừa',
-        latin: 'Intestinum tenue & crassum',
-        english: 'Small & Large Intestine',
-        location: 'Khoang ổ bụng',
-        clinical: 'Ruột non dài ~6m (tá tràng, hỗng tràng, hồi tràng - nơi hấp thu dinh dưỡng chính). Ruột thừa nằm ở đáy manh tràng vùng hố chậu phải (điểm đau McBurney trong viêm ruột thừa cấp).',
-        keyStructures: ['Tá tràng (Duodenum)', 'Hỗng tràng & Hồi tràng', 'Manh tràng (Cecum)', 'Ruột thừa (Appendix)', 'Đại tràng sigma & Trực tràng']
-      }
-    ]
-  },
-  {
-    id: 'urinary',
-    name: 'Hệ Tiết Niệu',
-    latin: 'Systema urinarium',
-    english: 'Urinary System',
+    id: 'lymphoid',
+    name: 'Cơ Quan Bạch Huyết & Miễn Dịch',
+    latin: 'Organa lymphoidea',
+    english: 'Lymphoid organs',
     icon: 'Sparkles',
-    color: '#3b82f6',
-    description: 'Lọc máu, cân bằng nước điện giải, bài tiết chất độc và nước tiểu.',
+    color: '#06b6d4',
+    count: 'Lách, Tuyến ức, Hạch',
+    description: 'Hệ thống phòng vệ cơ thể chống nhiễm trùng, lọc tế bào lạ và hồi lưu dịch kẽ mô về tuần hoàn chung.',
     organs: [
       {
-        name: 'Hai Quả Thận',
-        latin: 'Renes',
-        english: 'Kidneys',
-        location: 'Sau phúc mạc hai bên cột sống thắt lưng',
-        clinical: 'Thận phải nằm thấp hơn thận trái ~1-2cm do bị gan đè. Mỗi thận có khoảng 1 triệu nephron (đơn vị lọc máu). Tiết hormone Erythropoietin kích thích tủy xương tạo hồng cầu.',
-        keyStructures: ['Vỏ thận (Cortex)', 'Tủy thận & Tháp Malpighi', 'Đài bể thận (Renal pelvis)', 'Động mạch thận', 'Nephron']
+        name: 'Quả Lách (Lách / Tỳ)',
+        latin: 'Lien / Splen',
+        english: 'Spleen',
+        location: 'Hạ sườn trái, nấp sau xương sườn 9-11',
+        clinical: 'Tạng miễn dịch lớn nhất, lọc máu và tiêu hủy hồng cầu già kiệt. Chấn thương ngực bụng kín vỡ lách gây xuất huyết nội ồ ạt nguy kịch.',
+        keyStructures: ['Tủy đỏ (Lọc máu, giữ hồng cầu)', 'Tủy trắng (Chứa tế bào lympho T và B)', 'Động mạch lách (Đi ngoằn ngoèo trên bờ trên tụy)', 'Rốn lách']
       },
       {
-        name: 'Niệu Quản, Bàng Quang & Niệu Đạo',
-        latin: 'Ureter, Vesica urinaria & Urethra',
-        english: 'Ureters, Bladder & Urethra',
-        location: 'Hố chậu và vùng đáy chậu',
-        clinical: 'Niệu quản dài ~25cm có 3 chỗ hẹp sinh lý (nơi nối bể thận, nơi bắt chéo bó mạch chậu, nơi cắm vào bàng quang) là vị trí hay bị kẹt sỏi niệu quản.',
-        keyStructures: ['Niệu quản (3 chỗ hẹp sinh lý)', 'Bàng quang (Dung tích ~400-500ml)', 'Tam giác bàng quang Lieutaud', 'Niệu đạo']
+        name: 'Tuyến Ức & Ống Ngực Bạch Huyết',
+        latin: 'Thymus & Ductus thoracicus',
+        english: 'Thymus & Thoracic Duct',
+        location: 'Trung thất trước trên và dọc cột sống ngực',
+        clinical: 'Tuyến ức là nơi biệt hóa lympho T (hoạt động mạnh ở trẻ em, teo mỡ ở người lớn). Ống ngực dẫn 3/4 dịch bạch huyết cơ thể đổ vào góc tĩnh mạch cảnh - dưới đòn trái.',
+        keyStructures: ['Tuyến ức (Thymus)', 'Ống ngực (Thoracic duct)', 'Bể dưỡng trấp Pecquet', 'Hạch bạch huyết vùng nách, bẹn, cổ']
+      }
+    ]
+  },
+  {
+    id: 'attachments',
+    name: 'Nguyên Ủy & Bám Tận Cơ',
+    latin: 'Origines & Insertiones musculorum',
+    english: 'Muscle attachments',
+    icon: 'Layers',
+    color: '#64748b',
+    count: 'Gân & Điểm bám xương',
+    description: 'Các vị trí bám giải phẫu của cơ vào khung xương tạo nên hệ thống đòn bẩy cơ sinh học của cơ thể người.',
+    organs: [
+      {
+        name: 'Điểm Bám Cơ Đai Vai & Cánh Tay',
+        latin: 'Insertiones cinguli pectoralis',
+        english: 'Shoulder & Arm Attachments',
+        location: 'Xương đòn, xương bả vai và xương cánh tay',
+        clinical: 'Củ lớn và củ bé xương cánh tay là điểm bám của 4 cơ chóp xoay vai. Rách điểm bám gân cơ trên gai là nguyên nhân hàng đầu gây đau vai mạn tính.',
+        keyStructures: ['Củ lớn xương cánh tay (Greater tubercle)', 'Củ bé (Lesser tubercle)', 'Mỏm cùng vai & Mỏm quạ', 'Lồi củ delta']
+      },
+      {
+        name: 'Điểm Bám Vùng Khung Chậu & Khớp Háng',
+        latin: 'Insertiones pelvis & femoris',
+        english: 'Pelvis & Hip Muscle Attachments',
+        location: 'Cánh chậu, ụ ngồi và xương đùi',
+        clinical: 'Mấu chuyển lớn và mấu chuyển nhỏ xương đùi là mốc giải phẫu cốt tử khi nắn chỉnh gãy xương hoặc phẫu thuật thay khớp háng nhân tạo.',
+        keyStructures: ['Mấu chuyển lớn xương đùi (Greater trochanter)', 'Mấu chuyển nhỏ (Lesser trochanter)', 'Gai chậu trước trên (ASIS)', 'Ụ ngồi (Ischial tuberosity)']
+      },
+      {
+        name: 'Gân Gót Achilles & Cân Gan Chân',
+        latin: 'Tendo calcaneus & Aponeurosis plantaris',
+        english: 'Achilles Tendon & Plantar Fascia',
+        location: 'Mặt sau cổ chân và lòng bàn chân',
+        clinical: 'Gân gót Achilles bám vào củ xương gót, chịu lực gấp 3-4 lần trọng lượng cơ thể khi chạy nhảy. Viêm cân gan chân gây đau nhói gót chân khi bước bước đầu tiên buổi sáng.',
+        keyStructures: ['Gân gót Achilles (Cơ bụng chân + Cơ dép)', 'Củ xương gót (Calcaneus)', 'Cân gan chân (Plantar aponeurosis)', 'Dải chậu chày (Iliotibial band)']
       }
     ]
   }
@@ -238,19 +445,94 @@ const ANATOMY_SYSTEMS = [
 
 export default function AnatomyAtlas({ setCurrentTab }) {
   const [selectedSystem, setSelectedSystem] = useState('skeletal')
-  const [selectedOrgan, setSelectedOrgan] = useState(ANATOMY_SYSTEMS[0].organs[0])
+  const [selectedOrgan, setSelectedOrgan] = useState(ANATOMY_SYSTEMS[2].organs[0])
   const [searchQuery, setSearchQuery] = useState('')
   const [viewMode, setViewMode] = useState('split') // 'split' | 'fullscreen_3d' | 'guide_only'
   const [iframeLoaded, setIframeLoaded] = useState(false)
   const [copiedNotice, setCopiedNotice] = useState(null)
   const iframeRef = useRef(null)
 
+  // Floating Vietnamese Medical Systems Menu State (Matches the requested UI screenshot)
+  const [isVnMenuOpen, setIsVnMenuOpen] = useState(true)
+  const [showHiddenAll, setShowHiddenAll] = useState(false)
+  const [treeSearch, setTreeSearch] = useState('')
+  const [expandedSystems, setExpandedSystems] = useState({
+    skeletal: true,
+    muscular: false,
+    regions: false,
+    joints: false,
+    cardiovascular: false,
+    visceral: false,
+    nervous: false,
+    lymphoid: false,
+    attachments: false
+  })
+
+  // Visibility toggles for each system in the tree
+  const [visibleSystems, setVisibleSystems] = useState({
+    regions: true,
+    muscular: true,
+    skeletal: true,
+    joints: true,
+    cardiovascular: true,
+    visceral: true,
+    nervous: true,
+    lymphoid: true,
+    attachments: false // default unchecked in anatomy atlas
+  })
+
   // Current active system object
   const currentSystemObj = useMemo(() => {
-    return ANATOMY_SYSTEMS.find(s => s.id === selectedSystem) || ANATOMY_SYSTEMS[0]
+    return ANATOMY_SYSTEMS.find(s => s.id === selectedSystem) || ANATOMY_SYSTEMS[2]
   }, [selectedSystem])
 
-  // Filtered organs across all systems based on search
+  // Filter systems in the tree based on quick text
+  const filteredTreeSystems = useMemo(() => {
+    if (!treeSearch.trim()) return ANATOMY_SYSTEMS
+    const q = treeSearch.toLowerCase().trim()
+    return ANATOMY_SYSTEMS.filter(sys => {
+      const matchSys = sys.name.toLowerCase().includes(q) ||
+        sys.english.toLowerCase().includes(q) ||
+        sys.latin.toLowerCase().includes(q)
+      const matchOrgan = sys.organs.some(o =>
+        o.name.toLowerCase().includes(q) ||
+        o.latin.toLowerCase().includes(q) ||
+        o.english.toLowerCase().includes(q)
+      )
+      return matchSys || matchOrgan
+    })
+  }, [treeSearch])
+
+  // Toggle system expansion
+  const toggleSystemExpand = (sysId, e) => {
+    e.stopPropagation()
+    setExpandedSystems(prev => ({
+      ...prev,
+      [sysId]: !prev[sysId]
+    }))
+  }
+
+  // Toggle system visibility
+  const toggleSystemVisibility = (sysId, e) => {
+    e.stopPropagation()
+    setVisibleSystems(prev => ({
+      ...prev,
+      [sysId]: !prev[sysId]
+    }))
+  }
+
+  // Toggle show all / hidden
+  const handleToggleShowHidden = () => {
+    const nextState = !showHiddenAll
+    setShowHiddenAll(nextState)
+    const newVis = {}
+    ANATOMY_SYSTEMS.forEach(s => {
+      newVis[s.id] = nextState
+    })
+    setVisibleSystems(newVis)
+  }
+
+  // Filtered organs across all systems based on general search
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return null
     const q = searchQuery.toLowerCase().trim()
@@ -291,7 +573,7 @@ export default function AnatomyAtlas({ setCurrentTab }) {
     }
   }
 
-  // Add structure into study notes / deadline
+  // Add structure into study notes
   const handleAddToNotes = (organ) => {
     try {
       const saved = localStorage.getItem('studymedia_notes')
@@ -338,12 +620,12 @@ export default function AnatomyAtlas({ setCurrentTab }) {
               <h1 className="text-xl md:text-2xl font-black text-white tracking-tight">
                 Atlas Giải Phẫu Học 3D • Y Khoa
               </h1>
-              <span className="px-2.5 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-bold font-mono">
-                Svitylo 3D WebGL
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold font-mono">
+                🇻🇳 Việt Hóa 100%
               </span>
             </div>
             <p className="text-xs md:text-sm text-slate-400 mt-0.5">
-              Mô hình 3D người tương tác thời gian thực với hơn 4.400 cấu trúc • Tra cứu song ngữ Anh - Việt - Latinh
+              Mô hình 3D người tương tác thời gian thực • Tra cứu song ngữ Y Khoa (Việt - Anh - Latinh)
             </p>
           </div>
         </div>
@@ -419,11 +701,24 @@ export default function AnatomyAtlas({ setCurrentTab }) {
                     3D Anatomy Canvas (WebGL2)
                   </span>
                   <span className="text-[11px] text-slate-400 hidden sm:inline">
-                    • Chuột trái: Xoay | Chuột phải/2 ngón: Di chuyển | Cuộn: Phóng to
+                    • Chuột trái: Xoay | Chuột phải: Di chuyển | Cuộn: Thu phóng
                   </span>
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setIsVnMenuOpen(!isVnMenuOpen)}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border ${
+                      isVnMenuOpen
+                        ? 'bg-rose-600/20 border-rose-500/40 text-rose-300'
+                        : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
+                    }`}
+                    title="Bật/Tắt Menu Hệ Cơ Quan Tiếng Việt"
+                  >
+                    <Layers className="w-3.5 h-3.5" />
+                    <span>{isVnMenuOpen ? 'Ẩn Menu' : 'Hiện Menu VN'}</span>
+                  </button>
+
                   <button
                     onClick={reloadIframe}
                     className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
@@ -464,12 +759,224 @@ export default function AnatomyAtlas({ setCurrentTab }) {
                 allow="accelerometer; camera; gyroscope; web-share; fullscreen"
                 loading="eager"
               />
+
+              {/* FLOATING VIETNAMESE MEDICAL SYSTEMS PANEL (Overlay directly matching screenshot) */}
+              {isVnMenuOpen ? (
+                <div className="absolute top-14 left-3 z-20 w-72 sm:w-80 max-w-[calc(100%-24px)] max-h-[calc(100%-72px)] bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-left-2 duration-200">
+                  {/* Panel Header */}
+                  <div className="px-4 py-3 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-rose-400" />
+                      <span className="font-bold text-sm text-white">Hệ Cơ Quan (Systems)</span>
+                      <span className="text-[10px] bg-rose-500/20 text-rose-300 font-bold px-1.5 py-0.5 rounded">
+                        Y Khoa
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setIsVnMenuOpen(false)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                      title="Thu gọn menu"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Show / Hide All Structures Button (Matching "Show hidden (705)") */}
+                  <div className="p-2 border-b border-slate-800/80 bg-slate-950/40">
+                    <button
+                      onClick={handleToggleShowHidden}
+                      className={`w-full py-2 px-3 rounded-xl border text-xs font-semibold flex items-center gap-2.5 transition-all ${
+                        showHiddenAll
+                          ? 'bg-rose-950/50 border-rose-500/40 text-rose-300'
+                          : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700/80 text-slate-200'
+                      }`}
+                    >
+                      {showHiddenAll ? <Eye className="w-4 h-4 text-emerald-400" /> : <Eye className="w-4 h-4 text-slate-400" />}
+                      <span>{showHiddenAll ? 'Đang hiện tất cả cấu trúc (705)' : 'Hiện các cấu trúc ẩn (705)'}</span>
+                    </button>
+                  </div>
+
+                  {/* Quick Filter Box */}
+                  <div className="px-2 pt-2 pb-1">
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="Lọc hệ cơ quan..."
+                        value={treeSearch}
+                        onChange={e => setTreeSearch(e.target.value)}
+                        className="w-full pl-8 pr-7 py-1.5 rounded-lg bg-slate-950/60 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500"
+                      />
+                      {treeSearch && (
+                        <button
+                          onClick={() => setTreeSearch('')}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Hierarchical Medical Systems Tree */}
+                  <div className="flex-1 overflow-y-auto p-2 space-y-1 scrollbar-thin scrollbar-thumb-slate-700">
+                    {filteredTreeSystems.map(sys => {
+                      const isSelected = selectedSystem === sys.id
+                      const isExpanded = expandedSystems[sys.id]
+                      const isVisible = visibleSystems[sys.id]
+
+                      return (
+                        <div key={sys.id} className="rounded-xl overflow-hidden">
+                          {/* System Row */}
+                          <div
+                            onClick={() => {
+                              setSelectedSystem(sys.id)
+                              setSelectedOrgan(sys.organs[0])
+                            }}
+                            className={`flex items-center justify-between px-2.5 py-2 rounded-xl cursor-pointer transition-all ${
+                              isSelected
+                                ? 'bg-blue-600/30 border border-blue-500/50 text-white shadow-sm'
+                                : 'hover:bg-slate-800/60 text-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              {/* Chevron expand */}
+                              <button
+                                onClick={(e) => toggleSystemExpand(sys.id, e)}
+                                className="p-0.5 rounded hover:bg-slate-700/50 text-slate-400 hover:text-white"
+                              >
+                                {isExpanded ? (
+                                  <ChevronDown className="w-3.5 h-3.5" />
+                                ) : (
+                                  <ChevronRight className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+
+                              {/* Eye visibility toggle */}
+                              <button
+                                onClick={(e) => toggleSystemVisibility(sys.id, e)}
+                                className={`p-0.5 rounded transition-colors ${
+                                  isVisible ? 'text-emerald-400 hover:text-emerald-300' : 'text-slate-500 hover:text-slate-400'
+                                }`}
+                                title={isVisible ? 'Ẩn hệ này' : 'Hiện hệ này'}
+                              >
+                                {isVisible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                              </button>
+
+                              {/* System Label */}
+                              <div className="truncate">
+                                <div className="text-xs font-semibold leading-tight truncate">
+                                  {sys.name}
+                                </div>
+                                <div className="text-[10px] text-slate-400 font-mono truncate">
+                                  {sys.english}
+                                </div>
+                              </div>
+                            </div>
+
+                            <span className="text-[10px] text-slate-500 font-mono pl-1 shrink-0">
+                              {sys.organs.length}
+                            </span>
+                          </div>
+
+                          {/* Expanded Organs Subtree */}
+                          {isExpanded && (
+                            <div className="ml-5 pl-2.5 my-1 border-l border-slate-700/60 space-y-1">
+                              {sys.organs.map((organ, oIdx) => {
+                                const isOrganCur = selectedOrgan?.name === organ.name
+                                return (
+                                  <div
+                                    key={oIdx}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setSelectedSystem(sys.id)
+                                      setSelectedOrgan(organ)
+                                    }}
+                                    className={`px-2 py-1.5 rounded-lg text-[11px] cursor-pointer transition-all flex items-center justify-between ${
+                                      isOrganCur
+                                        ? 'bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30'
+                                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                                    }`}
+                                  >
+                                    <div className="truncate pr-1">
+                                      <div className="truncate">{organ.name}</div>
+                                      <div className="text-[9px] font-mono italic text-slate-500 truncate">
+                                        {organ.latin}
+                                      </div>
+                                    </div>
+                                    <ChevronRight className={`w-3 h-3 shrink-0 ${isOrganCur ? 'text-rose-400' : 'text-slate-600'}`} />
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Panel Footer Guide Note */}
+                  <div className="p-2.5 bg-slate-950/90 border-t border-slate-800 text-[10px] text-slate-400 flex items-center justify-between">
+                    <span>💡 Nhấn cơ quan để xem lâm sàng</span>
+                    <span className="text-rose-400 font-bold">9 Hệ Cơ Quan</span>
+                  </div>
+                </div>
+              ) : (
+                /* Collapsed Pill Button on Canvas */
+                <button
+                  onClick={() => setIsVnMenuOpen(true)}
+                  className="absolute top-14 left-3 z-20 flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-white text-xs font-bold border border-slate-700/80 shadow-2xl backdrop-blur-md transition-all hover:scale-105"
+                  title="Mở Bảng Điều Khiển Hệ Cơ Quan Tiếng Việt"
+                >
+                  <Layers className="w-4 h-4 text-rose-400" />
+                  <span>Hệ Cơ Quan (Tiếng Việt)</span>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                </button>
+              )}
+
+              {/* Quick Floating Drawer in Fullscreen 3D mode */}
+              {viewMode === 'fullscreen_3d' && selectedOrgan && (
+                <div className="absolute bottom-3 left-3 right-3 sm:right-auto sm:max-w-md z-20 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-2xl p-4 shadow-2xl">
+                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <div>
+                      <h4 className="font-bold text-sm text-rose-300">{selectedOrgan.name}</h4>
+                      <p className="text-[11px] text-slate-400 font-mono">
+                        {selectedOrgan.latin} • {selectedOrgan.english}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setSelectedOrgan(null)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-300 line-clamp-2 mb-2 leading-relaxed">
+                    {selectedOrgan.clinical}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleAddToFlashcard(selectedOrgan)}
+                      className="px-2.5 py-1 rounded-lg bg-purple-600/30 hover:bg-purple-600/40 text-purple-300 text-xs font-semibold border border-purple-500/30 flex items-center gap-1"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      <span>Thêm Flashcard</span>
+                    </button>
+                    <button
+                      onClick={() => setViewMode('split')}
+                      className="px-2.5 py-1 rounded-lg bg-blue-600/30 hover:bg-blue-600/40 text-blue-300 text-xs font-semibold border border-blue-500/30"
+                    >
+                      Xem Chi Tiết Đầy Đủ
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
 
         {/* Vietnamese Medical Handbook & Search Panel */}
-        {viewMode !== 'fullscreen_3d' && (
+        {viewMode !== 'guide_only' && (
           <div className={`${viewMode === 'split' ? 'lg:col-span-5 xl:col-span-5' : 'w-full max-w-5xl mx-auto'}`}>
             <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 shadow-2xl space-y-5 flex flex-col h-[650px] lg:h-[780px]">
               {/* Search Bar */}
