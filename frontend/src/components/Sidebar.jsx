@@ -1,4 +1,5 @@
 import React from 'react'
+import { motion } from 'framer-motion'
 import {
   GraduationCap,
   CalendarCheck,
@@ -55,10 +56,13 @@ export default function Sidebar({ currentTab, setCurrentTab }) {
           const Icon = item.icon
           const isActive = currentTab === item.id
           return (
-            <button
+            <motion.button
               key={item.id}
               onClick={() => setCurrentTab(item.id)}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group ${
+              whileHover={{ x: 4 }}
+              whileTap={{ scale: 0.97 }}
+              transition={{ type: 'spring', stiffness: 450, damping: 20 }}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer group ${
                 isActive
                   ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
@@ -79,7 +83,7 @@ export default function Sidebar({ currentTab, setCurrentTab }) {
                   {item.badge}
                 </span>
               )}
-            </button>
+            </motion.button>
           )
         })}
 
@@ -90,10 +94,13 @@ export default function Sidebar({ currentTab, setCurrentTab }) {
           const Icon = item.icon
           const isActive = currentTab === item.id
           return (
-            <button
+            <motion.button
               key={item.id}
               onClick={() => setCurrentTab(item.id)}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group ${
+              whileHover={{ x: 4 }}
+              whileTap={{ scale: 0.97 }}
+              transition={{ type: 'spring', stiffness: 450, damping: 20 }}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer group ${
                 isActive
                   ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-600/30'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
@@ -110,7 +117,7 @@ export default function Sidebar({ currentTab, setCurrentTab }) {
                   {item.badge}
                 </span>
               )}
-            </button>
+            </motion.button>
           )
         })}
       </nav>
