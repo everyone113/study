@@ -137,11 +137,12 @@ export default function SmartUtilities() {
     }
   }
 
-  // Flashcards CRUD
   const fetchCards = async () => {
     try {
       const res = await axios.get('/api/tools/flashcards')
-      setCards(res.data)
+      if (Array.isArray(res.data)) {
+        setCards(res.data)
+      }
     } catch (err) {
       console.error(err)
     }

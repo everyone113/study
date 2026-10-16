@@ -12,21 +12,151 @@ import {
   ChevronDown
 } from 'lucide-react'
 
+const FALLBACK_SNIPPETS = {
+  java: [
+    {
+      id: 'java_hello',
+      title: 'Hello World & Scanner',
+      description: 'Cú pháp cơ bản và nhập xuất dữ liệu trong Java',
+      code: `import java.util.Scanner;
+
+public class Main {
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        System.out.println("Xin chào! Hãy nhập tên của bạn:");
+        String name = sc.hasNextLine() ? sc.nextLine() : "Sinh viên";
+        System.out.println("Chào mừng " + name + " đến với StudyMediaHub!");
+    }
+}`
+    },
+    {
+      id: 'java_oop',
+      title: 'Lập trình Hướng đối tượng (OOP)',
+      description: 'Ví dụ về Kế thừa, Đóng gói và Đa hình trong Java',
+      code: `class SinhVien {
+    private String mssv;
+    private String hoTen;
+    private double diemGpa;
+
+    public SinhVien(String mssv, String hoTen, double diemGpa) {
+        this.mssv = mssv;
+        this.hoTen = hoTen;
+        this.diemGpa = diemGpa;
+    }
+
+    public void hienThi() {
+        System.out.println("MSSV: " + mssv + " | Họ tên: " + hoTen + " | GPA: " + diemGpa);
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        SinhVien sv1 = new SinhVien("B21DCCN001", "Nguyễn Văn An", 3.75);
+        SinhVien sv2 = new SinhVien("B21DCCN002", "Trần Thị Mai", 3.90);
+        sv1.hienThi();
+        sv2.hienThi();
+    }
+}`
+    },
+    {
+      id: 'java_collections',
+      title: 'ArrayList & Sắp xếp Object',
+      description: 'Sử dụng Collections.sort và Comparator trong Java',
+      code: `import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        List<Integer> numbers = new ArrayList<>(Arrays.asList(42, 15, 88, 3, 99, 21));
+        System.out.println("Mảng ban đầu: " + numbers);
+        
+        Collections.sort(numbers);
+        System.out.println("Sau khi sắp xếp tăng dần: " + numbers);
+        
+        numbers.sort(Collections.reverseOrder());
+        System.out.println("Sau khi sắp xếp giảm dần: " + numbers);
+    }
+}`
+    }
+  ],
+  cpp: [
+    {
+      id: 'cpp_hello',
+      title: 'Hello World & Nhập Xuất',
+      description: 'Cú pháp cin, cout chuẩn trong C++',
+      code: `#include <iostream>
+#include <string>
+using namespace std;
+
+int main() {
+    ios_base::sync_with_stdio(false);
+    cin.tie(NULL);
+    cout << "Xin chao cac lap trinh vien C++!" << endl;
+    return 0;
+}`
+    },
+    {
+      id: 'cpp_stl',
+      title: 'STL Vector, Map & Sort',
+      description: 'Cấu trúc dữ liệu Vector và Map trong STL',
+      code: `#include <iostream>
+#include <vector>
+#include <algorithm>
+#include <map>
+using namespace std;
+
+int main() {
+    vector<int> a = {50, 10, 40, 20, 30};
+    sort(a.begin(), a.end());
+    
+    cout << "Day da sap xep: ";
+    for (int x : a) cout << x << " ";
+    cout << endl;
+
+    map<string, int> scores;
+    scores["C++"] = 10;
+    scores["Java"] = 9;
+    scores["Python"] = 10;
+
+    cout << "Diem mon C++: " << scores["C++"] << endl;
+    return 0;
+}`
+    }
+  ],
+  python: [
+    {
+      id: 'py_basics',
+      title: 'Cấu trúc dữ liệu & List Comprehension',
+      description: 'Ôn tập Dict, List, Set và Lambda',
+      code: `numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+squares = [x**2 for x in numbers if x % 2 == 0]
+print("Bình phương các số chẵn:", squares)
+
+students = [
+    {"name": "An", "gpa": 3.8},
+    {"name": "Bình", "gpa": 3.2},
+    {"name": "Châu", "gpa": 3.95}
+]
+sorted_students = sorted(students, key=lambda s: s["gpa"], reverse=True)
+print("Xếp hạng GPA:", sorted_students)`
+    }
+  ]
+}
+
 export default function CodePlayground() {
   const [language, setLanguage] = useState('java')
   const [code, setCode] = useState('')
   const [stdin, setStdin] = useState('')
   const [output, setOutput] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [snippets, setSnippets] = useState({})
-  const [selectedSnippet, setSelectedSnippet] = useState(null)
+  const [snippets, setSnippets] = useState(FALLBACK_SNIPPETS)
+  const [selectedSnippet, setSelectedSnippet] = useState(FALLBACK_SNIPPETS.java[0])
 
   useEffect(() => {
     fetchSnippets()
   }, [])
 
   useEffect(() => {
-    if (snippets[language] && snippets[language].length > 0) {
+    if (snippets && snippets[language] && Array.isArray(snippets[language]) && snippets[language].length > 0) {
       setCode(snippets[language][0].code)
       setSelectedSnippet(snippets[language][0])
     }
@@ -35,13 +165,15 @@ export default function CodePlayground() {
   const fetchSnippets = async () => {
     try {
       const res = await axios.get('/api/code/snippets')
-      setSnippets(res.data)
-      if (res.data.java && res.data.java.length > 0) {
-        setCode(res.data.java[0].code)
-        setSelectedSnippet(res.data.java[0])
+      if (res.data && typeof res.data === 'object' && !Array.isArray(res.data) && typeof res.data !== 'string') {
+        setSnippets(res.data)
+        if (res.data.java && Array.isArray(res.data.java) && res.data.java.length > 0) {
+          setCode(res.data.java[0].code)
+          setSelectedSnippet(res.data.java[0])
+        }
       }
     } catch (err) {
-      console.error(err)
+      console.warn('Backend offline or static mode, using fallback snippets:', err.message)
     }
   }
 
