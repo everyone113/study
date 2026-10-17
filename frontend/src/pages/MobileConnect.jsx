@@ -1083,7 +1083,7 @@ export default function MobileConnect({ setCurrentTab }) {
   }, [safeFiles, fileFilter])
 
   return (
-    <div className="space-y-6 pb-12 max-w-6xl mx-auto">
+    <div className="space-y-6 pb-36 max-w-6xl mx-auto">
       {/* Top Banner & Tab Navigation */}
       <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1555,8 +1555,10 @@ export default function MobileConnect({ setCurrentTab }) {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-16 px-4 bg-slate-950/40 rounded-3xl border border-dashed border-slate-800">
-                <Smartphone className="w-12 h-12 text-slate-600 mx-auto mb-3 animate-bounce" />
+              <div className="text-center py-14 px-4 bg-slate-950/40 rounded-3xl border border-dashed border-slate-800">
+                <div className="w-14 h-14 rounded-2xl bg-slate-900/90 border border-slate-800 text-slate-400 flex items-center justify-center mx-auto mb-3 shadow-inner">
+                  <Smartphone className="w-7 h-7" />
+                </div>
                 <h4 className="font-bold text-sm text-slate-300">Kho nhận đang trống</h4>
                 <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
                   Hãy mở Camera điện thoại quét mã QR ở trên để bắn ảnh/video ngay lập tức sang PC!
