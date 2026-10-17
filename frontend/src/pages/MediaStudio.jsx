@@ -14,6 +14,8 @@ import {
   Scissors
 } from 'lucide-react'
 
+import { removeBackgroundClient, compressImageForUpload } from '../utils/bgRemoverClient'
+
 export default function MediaStudio() {
   const [activeTab, setActiveTab] = useState('downloader') // 'downloader' | 'antidup' | 'nobg'
 
@@ -36,6 +38,9 @@ export default function MediaStudio() {
   const [bgPreview, setBgPreview] = useState(null)
   const [bgLoading, setBgLoading] = useState(false)
   const [bgResult, setBgResult] = useState(null)
+  const [bgTolerance, setBgTolerance] = useState(42)
+  const [bgFeather, setBgFeather] = useState(16)
+  const [showBgSettings, setShowBgSettings] = useState(false)
 
   const handleBgFileSelect = (e) => {
     const file = e.target.files?.[0]
@@ -212,20 +217,52 @@ export default function MediaStudio() {
     }
   }
 
-  // 3. Background Removal
-  const handleBgRemoval = async (e) => {
-    e.preventDefault()
+  // 3. Background Removal (Dual Engine: Local U2-Net AI + Client-Side High-Speed Canvas)
+  const handleBgRemoval = async (e, customTolerance = null, customFeather = null) => {
+    if (e && e.preventDefault) e.preventDefault()
     if (!bgFile) return
     setBgLoading(true)
-    setBgResult(null)
 
     try {
-      const formData = new FormData()
-      formData.append('file', bgFile)
-      const res = await axios.post('/api/tools/remove-bg', formData)
-      setBgResult(res.data)
+      const tol = customTolerance ?? bgTolerance
+      const fea = customFeather ?? bgFeather
+      const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      let backendSuccess = false
+
+      // Try local U2-Net AI if running on localhost / desktop environment
+      if (isLocalHost) {
+        try {
+          const optimizedFile = await compressImageForUpload(bgFile, 1920, 0.9)
+          const formData = new FormData()
+          formData.append('file', optimizedFile)
+          const res = await axios.post('/api/tools/remove-bg', formData, { timeout: 12000 })
+          if (res.data && (res.data.data_url || res.data.result_url)) {
+            setBgResult({
+              ...res.data,
+              engine: 'ai_u2net'
+            })
+            backendSuccess = true
+          }
+        } catch (backendErr) {
+          console.warn('[AI Backend] Local backend not responding or timeout, falling back to client canvas engine:', backendErr)
+        }
+      }
+
+      // If on Vercel (or backend not reachable), run instant client-side canvas engine
+      if (!backendSuccess) {
+        const clientRes = await removeBackgroundClient(bgFile, {
+          tolerance: tol,
+          feather: fea
+        })
+        setBgResult({
+          ...clientRes,
+          result_filename: `nobg_${(bgFile.name || 'image').replace(/\.[^/.]+$/, '')}.png`,
+          engine: 'client_canvas'
+        })
+      }
     } catch (err) {
-      alert(err.response?.data?.detail || 'Lỗi khi tách nền ảnh')
+      console.error('[Background Removal Error]:', err)
+      alert('Không thể tách nền: ' + (err.message || 'Lỗi xử lý ảnh'))
     } finally {
       setBgLoading(false)
     }
@@ -552,29 +589,88 @@ export default function MediaStudio() {
                 </div>
               )}
 
+              {/* Advanced Fine-Tuning Controls */}
+              <div className="pt-2 border-t border-slate-800/80">
+                <button
+                  type="button"
+                  onClick={() => setShowBgSettings(!showBgSettings)}
+                  className="text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1.5 font-medium transition-colors"
+                >
+                  <Sliders className="w-3.5 h-3.5" />
+                  <span>{showBgSettings ? 'Ẩn tùy chỉnh độ nhạy' : 'Tùy chỉnh nâng cao (Độ nhạy & Độ mềm viền)'}</span>
+                </button>
+
+                {showBgSettings && (
+                  <div className="mt-3 p-4 bg-slate-800/40 rounded-2xl border border-slate-700/50 space-y-4 animate-in fade-in">
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-xs font-semibold text-slate-300">
+                        <span>Độ nhạy nhận diện nền (Tolerance):</span>
+                        <span className="text-purple-400">{bgTolerance}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="15"
+                        max="85"
+                        value={bgTolerance}
+                        onChange={(e) => setBgTolerance(Number(e.target.value))}
+                        className="w-full accent-purple-500 cursor-pointer"
+                      />
+                      <div className="flex justify-between text-[10px] text-slate-500">
+                        <span>Chặt chẽ (Giữ nguyên vật thể)</span>
+                        <span>Mạnh mẽ (Tách sạch phông nền)</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-xs font-semibold text-slate-300">
+                        <span>Độ mềm mịn viền (Feathering):</span>
+                        <span className="text-purple-400">{bgFeather}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="2"
+                        max="35"
+                        value={bgFeather}
+                        onChange={(e) => setBgFeather(Number(e.target.value))}
+                        className="w-full accent-purple-500 cursor-pointer"
+                      />
+                      <div className="flex justify-between text-[10px] text-slate-500">
+                        <span>Viền sắc cạnh</span>
+                        <span>Viền chuyển mượt tự nhiên</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <button
                 type="submit"
                 disabled={bgLoading || !bgFile}
                 className="w-full py-3 rounded-2xl bg-purple-600 hover:bg-purple-500 disabled:bg-slate-800 disabled:cursor-not-allowed text-white font-bold text-sm shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 transition-all"
               >
                 <Scissors className="w-4 h-4" />
-                <span>{bgLoading ? 'AI đang phân tích & tách nền siêu tốc...' : 'Xóa Phông Nền (PNG Transparent)'}</span>
+                <span>{bgLoading ? 'Hệ thống đang phân tích & tách nền...' : 'Xóa Phông Nền (PNG Transparent)'}</span>
               </button>
             </form>
           </div>
 
           {bgResult && (
             <div className="bg-slate-900 border border-purple-500/30 rounded-3xl p-6 shadow-2xl space-y-6 animate-in fade-in">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-5 h-5 text-emerald-400" />
                   <h4 className="font-bold text-base text-white">Ảnh Đã Xóa Phông Thành Công!</h4>
                 </div>
-                {bgResult.elapsed_seconds && (
-                  <span className="text-xs px-2.5 py-1 rounded-full bg-purple-900/40 text-purple-300 border border-purple-700/40">
-                    Tốc độ xử lý: {bgResult.elapsed_seconds}s
+                <div className="flex items-center gap-2">
+                  <span className="text-xs px-2.5 py-1 rounded-full bg-purple-900/40 text-purple-300 border border-purple-700/40 font-medium">
+                    {bgResult.engine === 'ai_u2net' ? '✨ AI U²-Net Engine' : '⚡ Web Canvas Engine (Vercel Siêu Tốc)'}
                   </span>
-                )}
+                  {bgResult.elapsed_seconds && (
+                    <span className="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                      {bgResult.elapsed_seconds}s
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Side-by-side comparison */}
@@ -618,14 +714,26 @@ export default function MediaStudio() {
                 <p className="text-xs text-slate-400">
                   Nền ảnh đã được chuyển đổi hoàn toàn sang kênh alpha trong suốt (PNG), bạn có thể ném vào Photoshop, Canva, CapCut hoặc ghép vào video mà không bị viền trắng.
                 </p>
-                <a
-                  href={bgResult.data_url || bgResult.result_url}
-                  download={bgResult.result_filename || 'anh_tach_nen.png'}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 whitespace-nowrap transition-all"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Tải Ảnh PNG Trong Suốt</span>
-                </a>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  {showBgSettings && (
+                    <button
+                      type="button"
+                      onClick={() => handleBgRemoval(null, bgTolerance, bgFeather)}
+                      disabled={bgLoading}
+                      className="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs border border-slate-700 whitespace-nowrap transition-all"
+                    >
+                      <span>Tách lại</span>
+                    </button>
+                  )}
+                  <a
+                    href={bgResult.data_url || bgResult.result_url}
+                    download={bgResult.result_filename || 'anh_tach_nen.png'}
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 whitespace-nowrap transition-all"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Tải Ảnh PNG Trong Suốt</span>
+                  </a>
+                </div>
               </div>
             </div>
           )}
