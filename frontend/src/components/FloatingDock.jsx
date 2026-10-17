@@ -104,26 +104,28 @@ function DockIcon({ item, currentTab, setCurrentTab, mouseX }) {
       {/* Apple-style floating tooltip with Spring physics - Positioned ABOVE dock, zero clipping, z-50 */}
       <AnimatePresence>
         {hovered && (
-          <motion.div
-            initial={{ opacity: 0, y: 14, scale: 0.82 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.88 }}
-            transition={{ type: 'spring', stiffness: 480, damping: 22 }}
-            className="absolute bottom-[calc(100%+14px)] left-1/2 -translate-x-1/2 pointer-events-none z-50 flex flex-col items-center"
-          >
-            {/* Tooltip Card */}
-            <div className="px-3 py-1.5 rounded-xl bg-slate-900/95 border border-slate-700/90 backdrop-blur-2xl text-white shadow-[0_12px_32px_rgba(0,0,0,0.85)] flex items-center gap-2 whitespace-nowrap ring-1 ring-white/10">
-              <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-cyan-400 shadow-[0_0_8px_#38bdf8]' : 'bg-slate-400'}`} />
-              <span className="text-xs font-bold tracking-tight">{item.label}</span>
-              {item.badge && (
-                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-blue-500/25 text-blue-300 border border-blue-400/30">
-                  {item.badge}
-                </span>
-              )}
-            </div>
-            {/* Downward Arrow Pointer */}
-            <div className="w-2.5 h-2.5 bg-slate-900 border-r border-b border-slate-700/90 rotate-45 -mt-1.5 shadow-sm" />
-          </motion.div>
+          <div className="absolute bottom-[calc(100%+14px)] left-1/2 -translate-x-1/2 pointer-events-none z-50 flex flex-col items-center">
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.85 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 6, scale: 0.9 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 24 }}
+              className="flex flex-col items-center"
+            >
+              {/* Tooltip Card */}
+              <div className="px-3 py-1.5 rounded-xl bg-slate-900/95 border border-slate-700/90 backdrop-blur-2xl text-white shadow-[0_12px_32px_rgba(0,0,0,0.85)] flex items-center gap-2 whitespace-nowrap ring-1 ring-white/10">
+                <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-cyan-400 shadow-[0_0_8px_#38bdf8]' : 'bg-slate-400'}`} />
+                <span className="text-xs font-bold tracking-tight">{item.label}</span>
+                {item.badge && (
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-blue-500/25 text-blue-300 border border-blue-400/30">
+                    {item.badge}
+                  </span>
+                )}
+              </div>
+              {/* Downward Arrow Pointer */}
+              <div className="w-2.5 h-2.5 bg-slate-900 border-r border-b border-slate-700/90 rotate-45 -mt-1.5 shadow-sm" />
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </motion.button>
