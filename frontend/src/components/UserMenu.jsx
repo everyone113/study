@@ -21,6 +21,31 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
+// Error boundary to gracefully catch any QR rendering issues
+class QRErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false }
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+  componentDidCatch(err) {
+    console.warn('QR Render Error:', err)
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="w-[180px] h-[180px] flex flex-col items-center justify-center p-3 text-center text-xs text-rose-500 bg-rose-50 rounded-xl">
+          <span className="font-bold">Không thể hiển thị mã QR</span>
+          <span className="text-[10px] text-slate-500 mt-1">Dữ liệu quá dài. Vui lòng bấm sao chép link bên dưới.</span>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
 export default function UserMenu({ isMobile = false }) {
   const {
     currentUser,
@@ -37,9 +62,23 @@ export default function UserMenu({ isMobile = false }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [copiedId, setCopiedId] = useState(false)
   const [copiedToken, setCopiedToken] = useState(false)
+  const [copiedLink, setCopiedLink] = useState(false)
+  const [syncUrl, setSyncUrl] = useState('')
   const [syncingLocal, setSyncingLocal] = useState(false)
   const [showQrModal, setShowQrModal] = useState(false)
   const menuRef = useRef(null)
+
+  // Compute syncUrl whenever QR modal opens
+  useEffect(() => {
+    if (showQrModal && currentUser) {
+      try {
+        const url = generateSyncUrl()
+        setSyncUrl(url || '')
+      } catch (err) {
+        console.error('Error computing sync url:', err)
+      }
+    }
+  }, [showQrModal, currentUser, generateSyncUrl])
 
   // Click outside to close menu
   useEffect(() => {
@@ -115,7 +154,16 @@ export default function UserMenu({ isMobile = false }) {
     )
   }
 
-  const syncUrl = generateSyncUrl()
+  const handleCopyLink = () => {
+    const url = syncUrl || generateSyncUrl()
+    if (url) {
+      navigator.clipboard.writeText(url)
+      setCopiedLink(true)
+      setTimeout(() => setCopiedLink(false), 2500)
+    }
+  }
+
+  const activeSyncUrl = syncUrl || (showQrModal ? generateSyncUrl() : '')
 
   return (
     <>
@@ -318,44 +366,83 @@ export default function UserMenu({ isMobile = false }) {
 
               {/* QR Code Container */}
               <div className="my-4 p-3.5 bg-white rounded-2xl inline-block shadow-2xl ring-4 ring-emerald-500/20">
-                {syncUrl ? (
-                  <QRCodeSVG
-                    value={syncUrl}
-                    size={175}
-                    bgColor="#ffffff"
-                    fgColor="#0f172a"
-                    level="L"
-                  />
-                ) : (
-                  <div className="w-[175px] h-[175px] flex items-center justify-center text-slate-800 text-xs">
-                    Đang tạo mã...
-                  </div>
-                )}
+                <QRErrorBoundary>
+                  {activeSyncUrl ? (
+                    <QRCodeSVG
+                      value={activeSyncUrl}
+                      size={180}
+                      bgColor="#ffffff"
+                      fgColor="#0f172a"
+                      level="M"
+                      includeMargin={false}
+                    />
+                  ) : (
+                    <div className="w-[180px] h-[180px] flex flex-col items-center justify-center text-slate-700 text-xs">
+                      <RefreshCw className="w-5 h-5 animate-spin text-emerald-600 mb-1.5" />
+                      <span>Đang tạo mã QR...</span>
+                    </div>
+                  )}
+                </QRErrorBoundary>
               </div>
 
-              {/* Copy Token Button */}
+              {/* Action Buttons */}
               <div className="space-y-2">
+                {/* Copy Direct Login URL Button */}
                 <button
                   type="button"
-                  onClick={handleCopyToken}
-                  className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 text-xs font-semibold transition-all flex items-center justify-center gap-2 border border-slate-700 cursor-pointer active:scale-98"
+                  onClick={handleCopyLink}
+                  className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 cursor-pointer active:scale-98"
                 >
-                  {copiedToken ? (
+                  {copiedLink ? (
                     <>
-                      <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <span className="text-emerald-400 font-bold">Đã sao chép mã đồng bộ!</span>
+                      <Check className="w-4 h-4 text-white shrink-0" />
+                      <span>Đã sao chép link đăng nhập!</span>
                     </>
                   ) : (
                     <>
-                      <Copy className="w-4 h-4 text-slate-400 shrink-0" />
-                      <span>Sao chép mã đồng bộ (gửi qua tin nhắn)</span>
+                      <Copy className="w-4 h-4 text-emerald-100 shrink-0" />
+                      <span>Sao chép link đăng nhập (gửi Zalo / tin nhắn)</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Copy Full Vault JSON Token Button */}
+                <button
+                  type="button"
+                  onClick={handleCopyToken}
+                  className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 text-xs font-semibold transition-all flex items-center justify-center gap-2 border border-slate-700/80 cursor-pointer active:scale-98"
+                >
+                  {copiedToken ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span className="text-emerald-400 font-bold">Đã sao chép mã đầy đủ!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span>Sao chép mã khôi phục đầy đủ (JSON Token)</span>
                     </>
                   )}
                 </button>
               </div>
 
-              <p className="text-[11px] text-slate-400 mt-3 leading-normal">
-                Toàn bộ bảng điểm GPA, lịch thi và tài liệu sẽ được đồng bộ sang điện thoại ngay khi mở link!
+              {/* Direct Open in New Tab for Testing */}
+              {activeSyncUrl && (
+                <div className="mt-3">
+                  <a
+                    href={activeSyncUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400 hover:text-emerald-300 transition-colors"
+                  >
+                    <span>Mở thử link đăng nhập trên tab mới</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              )}
+
+              <p className="text-[11px] text-slate-400 mt-2.5 leading-normal">
+                Toàn bộ tài khoản, mật khẩu và dữ liệu học tập sẽ được chuyển sang điện thoại ngay khi mở link!
               </p>
             </motion.div>
           </motion.div>,
