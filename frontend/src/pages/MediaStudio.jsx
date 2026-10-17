@@ -33,8 +33,18 @@ export default function MediaStudio() {
 
   // Background Remover states
   const [bgFile, setBgFile] = useState(null)
+  const [bgPreview, setBgPreview] = useState(null)
   const [bgLoading, setBgLoading] = useState(false)
   const [bgResult, setBgResult] = useState(null)
+
+  const handleBgFileSelect = (e) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setBgFile(file)
+      setBgPreview(URL.createObjectURL(file))
+      setBgResult(null)
+    }
+  }
 
   // Helper to trigger direct browser download
   const triggerDirectDownload = async (fileUrl, filename) => {
@@ -513,7 +523,7 @@ export default function MediaStudio() {
           <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6">
             <h3 className="font-bold text-sm text-slate-300 uppercase tracking-wider mb-3 flex items-center gap-2">
               <Scissors className="w-4 h-4 text-purple-400" />
-              Tách Nền Vật Thể & Chủ Thể Bằng AI
+              Tách Nền Vật Thể & Chủ Thể Bằng AI Siêu Tốc (U²-Net)
             </h3>
 
             <form onSubmit={handleBgRemoval} className="space-y-4">
@@ -525,49 +535,93 @@ export default function MediaStudio() {
                   type="file"
                   required
                   accept="image/*"
-                  onChange={e => setBgFile(e.target.files[0])}
-                  className="w-full text-xs text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-500"
+                  onChange={handleBgFileSelect}
+                  className="w-full text-xs text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-500 cursor-pointer"
                 />
               </div>
+
+              {bgPreview && !bgResult && (
+                <div className="flex items-center gap-3 p-3 bg-slate-800/40 rounded-2xl border border-slate-800">
+                  <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-950 flex-shrink-0 border border-slate-700">
+                    <img src={bgPreview} alt="Gốc" className="w-full h-full object-cover" />
+                  </div>
+                  <div className="text-xs text-slate-300 space-y-0.5 truncate">
+                    <p className="font-medium truncate">{bgFile?.name}</p>
+                    <p className="text-[10px] text-slate-500">{(bgFile?.size / 1024 / 1024).toFixed(2)} MB • Sẵn sàng tách nền</p>
+                  </div>
+                </div>
+              )}
 
               <button
                 type="submit"
                 disabled={bgLoading || !bgFile}
-                className="w-full py-3 rounded-2xl bg-purple-600 hover:bg-purple-500 disabled:bg-slate-800 text-white font-bold text-sm shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2"
+                className="w-full py-3 rounded-2xl bg-purple-600 hover:bg-purple-500 disabled:bg-slate-800 disabled:cursor-not-allowed text-white font-bold text-sm shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 transition-all"
               >
                 <Scissors className="w-4 h-4" />
-                <span>{bgLoading ? 'AI đang phân tích & tách nền...' : 'Xóa Phông Nền (PNG Transparent)'}</span>
+                <span>{bgLoading ? 'AI đang phân tích & tách nền siêu tốc...' : 'Xóa Phông Nền (PNG Transparent)'}</span>
               </button>
             </form>
           </div>
 
           {bgResult && (
-            <div className="bg-slate-900 border border-purple-500/30 rounded-3xl p-6 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6 animate-in fade-in">
-              {/* Image preview with checkerboard background */}
-              <div
-                className="w-64 h-64 rounded-2xl overflow-hidden border border-slate-700 flex items-center justify-center p-2"
-                style={{
-                  backgroundImage: 'linear-gradient(45deg, #1e293b 25%, transparent 25%), linear-gradient(-45deg, #1e293b 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #1e293b 75%), linear-gradient(-45deg, transparent 75%, #1e293b 75%)',
-                  backgroundSize: '20px 20px',
-                  backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
-                }}
-              >
-                <img
-                  src={bgResult.result_url}
-                  alt="Transparent result"
-                  className="max-w-full max-h-full object-contain drop-shadow-xl"
-                />
+            <div className="bg-slate-900 border border-purple-500/30 rounded-3xl p-6 shadow-2xl space-y-6 animate-in fade-in">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                  <h4 className="font-bold text-base text-white">Ảnh Đã Xóa Phông Thành Công!</h4>
+                </div>
+                {bgResult.elapsed_seconds && (
+                  <span className="text-xs px-2.5 py-1 rounded-full bg-purple-900/40 text-purple-300 border border-purple-700/40">
+                    Tốc độ xử lý: {bgResult.elapsed_seconds}s
+                  </span>
+                )}
               </div>
 
-              <div className="flex-1 space-y-3">
-                <h4 className="font-bold text-lg text-white">Ảnh Đã Xóa Phông Thành Công!</h4>
+              {/* Side-by-side comparison */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Original */}
+                {bgPreview && (
+                  <div className="space-y-2">
+                    <span className="text-xs font-semibold text-slate-400">Ảnh Gốc:</span>
+                    <div className="w-full h-64 rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 flex items-center justify-center p-2">
+                      <img src={bgPreview} alt="Original" className="max-w-full max-h-full object-contain" />
+                    </div>
+                  </div>
+                )}
+
+                {/* Transparent Result */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-purple-400">Kết Quả Nền Trong Suốt (PNG):</span>
+                    {bgResult.width && bgResult.height && (
+                      <span className="text-[11px] text-slate-500">{bgResult.width} × {bgResult.height}px</span>
+                    )}
+                  </div>
+                  <div
+                    className="w-full h-64 rounded-2xl overflow-hidden border border-purple-500/30 flex items-center justify-center p-2 shadow-inner"
+                    style={{
+                      backgroundImage: 'linear-gradient(45deg, #1e293b 25%, transparent 25%), linear-gradient(-45deg, #1e293b 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #1e293b 75%), linear-gradient(-45deg, transparent 75%, #1e293b 75%)',
+                      backgroundSize: '20px 20px',
+                      backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
+                    }}
+                  >
+                    <img
+                      src={bgResult.data_url || bgResult.result_url}
+                      alt="Transparent result"
+                      className="max-w-full max-h-full object-contain drop-shadow-2xl"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
                 <p className="text-xs text-slate-400">
-                  Nền ảnh đã được chuyển đổi hoàn toàn sang kênh alpha trong suốt (PNG), bạn có thể ném vào Photoshop, Canva hoặc ghép vào video mà không bị viền trắng.
+                  Nền ảnh đã được chuyển đổi hoàn toàn sang kênh alpha trong suốt (PNG), bạn có thể ném vào Photoshop, Canva, CapCut hoặc ghép vào video mà không bị viền trắng.
                 </p>
                 <a
-                  href={bgResult.result_url}
-                  download
-                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30"
+                  href={bgResult.data_url || bgResult.result_url}
+                  download={bgResult.result_filename || 'anh_tach_nen.png'}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 whitespace-nowrap transition-all"
                 >
                   <Download className="w-4 h-4" />
                   <span>Tải Ảnh PNG Trong Suốt</span>
