@@ -361,8 +361,13 @@ export function AuthProvider({ children }) {
       }
     } catch (apiErr) {
       console.warn('API Register offline, creating local client identity:', apiErr)
-      // Resilient Client-side Fallback
-      const localId = `usr_${Math.random().toString(36).substring(2, 9)}`
+      // Resilient Client-side Fallback with deterministic user ID
+      let hash = 0
+      for (let i = 0; i < cleanEmail.length; i++) {
+        hash = ((hash << 5) - hash) + cleanEmail.charCodeAt(i)
+        hash |= 0
+      }
+      const localId = `usr_${Math.abs(hash).toString(36)}`
       newUser = {
         id: localId,
         email: cleanEmail,
@@ -427,12 +432,14 @@ export function AuthProvider({ children }) {
       if (regRaw) {
         const registry = JSON.parse(regRaw)
         const record = registry[cleanEmail]
-        if (record && record.pwd === password) {
-          setCurrentUser(record.user)
-          setAuthModalOpen(false)
-          return { success: true, user: record.user }
-        } else if (record && record.pwd !== password) {
-          throw new Error('Mật khẩu không chính xác cho tài khoản này.')
+        if (record) {
+          if (record.pwd === password) {
+            setCurrentUser(record.user)
+            setAuthModalOpen(false)
+            return { success: true, user: record.user }
+          } else {
+            throw new Error('Mật khẩu không chính xác cho tài khoản này.')
+          }
         }
       }
     } catch (localErr) {
@@ -441,8 +448,52 @@ export function AuthProvider({ children }) {
       }
     }
 
-    // 3. If account not found on this device and backend is offline:
-    throw new Error('Tài khoản này được tạo trên máy tính khác. Vui lòng mở máy tính bấm "📱 Đồng bộ sang Điện thoại" và quét mã QR hoặc dán mã đồng bộ!')
+    // 3. New device login / offline resilient login:
+    // When logging in on a phone or new browser without prior local cache,
+    // seamlessly provision the account identity using the deterministic email hash.
+    if (cleanEmail && password) {
+      if (password.length < 4) {
+        throw new Error('Mật khẩu cần tối thiểu 4 ký tự.')
+      }
+
+      let hash = 0
+      for (let i = 0; i < cleanEmail.length; i++) {
+        hash = ((hash << 5) - hash) + cleanEmail.charCodeAt(i)
+        hash |= 0
+      }
+      const stableUid = `usr_${Math.abs(hash).toString(36)}`
+      const usernamePart = cleanEmail.split('@')[0]
+      const displayName = usernamePart.charAt(0).toUpperCase() + usernamePart.slice(1)
+
+      const provisionedUser = {
+        id: stableUid,
+        email: cleanEmail,
+        name: displayName,
+        avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${displayName}&backgroundColor=2563eb,4f46e5`,
+        student_id: '',
+        provider: 'email',
+        created_at: new Date().toISOString()
+      }
+
+      // Save credentials in local device registry so subsequent logins validate password
+      try {
+        const regRaw = localStorage.getItem(LOCAL_USERS_KEY)
+        const registry = regRaw ? JSON.parse(regRaw) : {}
+        registry[cleanEmail] = {
+          user: provisionedUser,
+          pwd: password
+        }
+        localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(registry))
+      } catch (e) {}
+
+      // Save active session
+      setCurrentUser(provisionedUser)
+      setAuthModalOpen(false)
+      window.dispatchEvent(new CustomEvent('studymedia:user_changed', { detail: { user: provisionedUser } }))
+      return { success: true, user: provisionedUser }
+    }
+
+    throw new Error('Vui lòng kiểm tra lại email và mật khẩu.')
   }
 
   /**
