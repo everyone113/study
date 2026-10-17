@@ -5,10 +5,13 @@ import {
   Clock,
   Sparkles,
   ExternalLink,
-  Compass
+  Compass,
+  Grid,
+  QrCode,
+  Layers
 } from 'lucide-react'
 
-export default function Header({ currentTab, setCurrentTab, showDock, setShowDock }) {
+export default function Header({ currentTab, setCurrentTab, showDock, setShowDock, onOpenMobileDrawer }) {
   const [timeStr, setTimeStr] = useState('')
 
   useEffect(() => {
@@ -35,18 +38,47 @@ export default function Header({ currentTab, setCurrentTab, showDock, setShowDoc
     mobile: 'Kết Nối Đa Thiết Bị (PC & Điện Thoại)'
   }
 
+  const shortTitles = {
+    dashboard: 'Tổng Quan',
+    academic: 'Môn & Điểm',
+    notes: 'Lịch & Deadline',
+    anatomy: 'Giải Phẫu 3D',
+    documents: 'Kho Tài Liệu',
+    code: 'Phòng Code',
+    uikit: 'Kho Giao Diện',
+    animation: 'Animation FX',
+    media: 'Xưởng Media',
+    smart: 'Tiện Ích AI',
+    mobile: 'WiFi Drop'
+  }
+
   return (
-    <header className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/80 px-4 md:px-8 py-3.5 flex items-center justify-between">
-      <div>
+    <header className="sticky top-0 z-40 bg-slate-950/85 backdrop-blur-xl border-b border-slate-800/80 px-4 md:px-8 py-3 flex items-center justify-between">
+      {/* Desktop Title */}
+      <div className="hidden md:block">
         <h2 className="text-lg md:text-xl font-bold text-white tracking-tight">
           {titles[currentTab] || 'StudyMediaHub'}
         </h2>
-        <p className="text-xs text-slate-400 hidden sm:block">
+        <p className="text-xs text-slate-400">
           Trạm điều hành học tập & công cụ cá nhân trên ổ D
         </p>
       </div>
 
-      <div className="flex items-center gap-3">
+      {/* Mobile App Bar */}
+      <div className="flex md:hidden items-center gap-2.5">
+        <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+          <GraduationCap className="w-4 h-4" />
+        </div>
+        <div className="leading-tight">
+          <h2 className="text-sm font-bold text-white tracking-tight flex items-center gap-1.5">
+            <span>{shortTitles[currentTab] || 'StudyMedia'}</span>
+          </h2>
+          <span className="text-[10px] text-blue-400 font-semibold">StudyMediaHub Mobile</span>
+        </div>
+      </div>
+
+      {/* Desktop Controls */}
+      <div className="hidden md:flex items-center gap-3">
         {/* Floating Dock Toggle Button */}
         {setShowDock && (
           <button
@@ -59,13 +91,13 @@ export default function Header({ currentTab, setCurrentTab, showDock, setShowDoc
             }`}
           >
             <Compass className={`w-3.5 h-3.5 ${showDock ? 'animate-spin-slow' : ''}`} />
-            <span className="hidden sm:inline">Đảo Nổi</span>
+            <span>Đảo Nổi</span>
             <span className={`w-1.5 h-1.5 rounded-full ${showDock ? 'bg-blue-400' : 'bg-slate-600'}`} />
           </button>
         )}
 
         {/* Real-time Clock */}
-        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono text-slate-300">
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono text-slate-300">
           <Clock className="w-3.5 h-3.5 text-blue-400" />
           <span>{timeStr}</span>
         </div>
@@ -75,6 +107,31 @@ export default function Header({ currentTab, setCurrentTab, showDock, setShowDoc
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
           <span>FastAPI Online</span>
         </div>
+      </div>
+
+      {/* Mobile Top Actions */}
+      <div className="flex md:hidden items-center gap-2">
+        {/* Quick WiFi Drop Button */}
+        {currentTab !== 'mobile' && (
+          <button
+            onClick={() => setCurrentTab('mobile')}
+            title="Bắn ảnh WiFi Drop"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-teal-500/15 border border-teal-500/30 text-teal-300 text-xs font-semibold active:scale-95 transition-transform"
+          >
+            <QrCode className="w-3.5 h-3.5" />
+            <span className="text-[11px]">Bắn ảnh</span>
+          </button>
+        )}
+
+        {/* Menu / All Tools Drawer Trigger */}
+        <button
+          onClick={onOpenMobileDrawer}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700/80 text-white text-xs font-bold active:scale-95 transition-all shadow-sm"
+        >
+          <Grid className="w-3.5 h-3.5 text-blue-400" />
+          <span>Menu</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+        </button>
       </div>
     </header>
   )

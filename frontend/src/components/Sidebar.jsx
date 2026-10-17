@@ -18,6 +18,8 @@ export const NAV_ITEMS = [
   {
     id: 'dashboard',
     label: 'Tổng quan',
+    shortLabel: 'Tổng Quan',
+    description: 'Bảng theo dõi GPA, tiến độ & câu nói triết học',
     icon: Layers,
     badge: null,
     category: 'study',
@@ -28,6 +30,8 @@ export const NAV_ITEMS = [
   {
     id: 'academic',
     label: 'Môn & Điểm số',
+    shortLabel: 'Điểm GPA',
+    description: 'Quản lý tín chỉ, điểm thành phần & GPA hệ 4.0',
     icon: GraduationCap,
     badge: null,
     category: 'study',
@@ -38,6 +42,8 @@ export const NAV_ITEMS = [
   {
     id: 'notes',
     label: 'Ghi chú & Lịch',
+    shortLabel: 'Lịch Trình',
+    description: 'Ghi chú học tập, nhắc nhở & đếm ngược deadline',
     icon: CalendarCheck,
     badge: null,
     category: 'study',
@@ -48,6 +54,8 @@ export const NAV_ITEMS = [
   {
     id: 'anatomy',
     label: 'Giải phẫu 3D',
+    shortLabel: 'Giải Phẫu',
+    description: 'Mô hình 3D tim, não, nội tạng & cơ xương Svitylo',
     icon: HeartPulse,
     badge: 'Y Khoa',
     category: 'study',
@@ -59,6 +67,8 @@ export const NAV_ITEMS = [
   {
     id: 'documents',
     label: 'Kho & Tải tài liệu',
+    shortLabel: 'Tài Liệu',
+    description: 'Tải tài liệu PDF, DOCX, slide môn học & lưu cục bộ',
     icon: FileDown,
     badge: null,
     category: 'study',
@@ -69,6 +79,8 @@ export const NAV_ITEMS = [
   {
     id: 'code',
     label: 'Phòng Code',
+    shortLabel: 'Phòng Code',
+    description: 'Biên dịch Java 21, C++, Python trực tiếp trên máy',
     icon: Terminal,
     badge: 'Java/C++',
     category: 'study',
@@ -80,6 +92,8 @@ export const NAV_ITEMS = [
   {
     id: 'uikit',
     label: 'Kho Giao Diện',
+    shortLabel: 'UI Kit',
+    description: '50+ mẫu component web Dark Mode & Apple UI',
     icon: Layout,
     badge: 'UI Kit',
     category: 'media',
@@ -91,6 +105,8 @@ export const NAV_ITEMS = [
   {
     id: 'animation',
     label: 'Animation Studio',
+    shortLabel: 'Animation',
+    description: 'Phòng thí nghiệm Framer Motion, GSAP, Anime.js',
     icon: Flame,
     badge: '60 FPS',
     category: 'media',
@@ -102,6 +118,8 @@ export const NAV_ITEMS = [
   {
     id: 'media',
     label: 'Xưởng Media',
+    shortLabel: 'Xưởng Media',
+    description: 'Xử lý video, hình ảnh & thuật toán chống trùng lặp',
     icon: Video,
     badge: 'Anti-Dup',
     category: 'media',
@@ -113,6 +131,8 @@ export const NAV_ITEMS = [
   {
     id: 'smart',
     label: 'Tiện ích AI',
+    shortLabel: 'Tiện Ích AI',
+    description: 'Dịch phụ đề trực tiếp, TTS giọng đọc & Flashcards',
     icon: Sparkles,
     badge: 'Live Sub',
     category: 'media',
@@ -124,6 +144,8 @@ export const NAV_ITEMS = [
   {
     id: 'mobile',
     label: 'WiFi Drop & Mobile',
+    shortLabel: 'WiFi Drop',
+    description: 'Bắn ảnh, video không dây giữa điện thoại & PC',
     icon: QrCode,
     badge: 'Bắn ảnh',
     category: 'media',

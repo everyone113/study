@@ -121,7 +121,7 @@ export default function FloatingDock({ currentTab, setCurrentTab }) {
   const ActiveIcon = activeItem.icon
 
   return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-[96vw]">
+    <div className="hidden md:block fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-[96vw]">
       <AnimatePresence mode="wait">
         {!collapsed ? (
           <motion.div

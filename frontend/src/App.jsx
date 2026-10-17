@@ -129,6 +129,9 @@ export default function App() {
     }
   }
 
+  // Mobile Feature Drawer state
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
+
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row font-['Plus_Jakarta_Sans',sans-serif]">
@@ -142,21 +145,25 @@ export default function App() {
             setCurrentTab={setCurrentTab}
             showDock={showDock}
             setShowDock={handleToggleDock}
+            onOpenMobileDrawer={() => setMobileDrawerOpen(true)}
           />
 
-          <main className={`flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full ${showDock ? 'pb-28 md:pb-24' : 'pb-24 md:pb-8'}`}>
+          <main className="flex-1 p-3.5 sm:p-4 md:p-8 max-w-7xl mx-auto w-full pb-28 md:pb-24">
             {renderContent()}
           </main>
 
-          {/* Interactive Floating Dock (Apple Dynamic Island & macOS Physics) */}
+          {/* Desktop Floating Dock (macOS Spring Magnification Physics) */}
           {showDock && (
             <FloatingDock currentTab={currentTab} setCurrentTab={setCurrentTab} />
           )}
 
-          {/* Fallback Mobile Navigation when Floating Dock is disabled */}
-          {!showDock && (
-            <MobileNav currentTab={currentTab} setCurrentTab={setCurrentTab} />
-          )}
+          {/* Dedicated Mobile Navigation Bar & 11-Tool Feature Drawer */}
+          <MobileNav
+            currentTab={currentTab}
+            setCurrentTab={setCurrentTab}
+            drawerOpen={mobileDrawerOpen}
+            setDrawerOpen={setMobileDrawerOpen}
+          />
         </div>
       </div>
     </ErrorBoundary>
