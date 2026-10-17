@@ -36,17 +36,88 @@ export default function MediaStudio() {
   const [bgLoading, setBgLoading] = useState(false)
   const [bgResult, setBgResult] = useState(null)
 
+  // Helper to trigger direct browser download
+  const triggerDirectDownload = async (fileUrl, filename) => {
+    try {
+      const resp = await fetch(fileUrl)
+      if (!resp.ok) throw new Error('Fetch status: ' + resp.status)
+      const blob = await resp.blob()
+      const blobUrl = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 10000)
+    } catch (e) {
+      window.open(fileUrl, '_blank')
+    }
+  }
+
   // 1. Fetch Video Info
   const handleFetchInfo = async (e) => {
     e.preventDefault()
+    if (!dlUrl.trim()) return
     setDlLoading(true)
     setVideoInfo(null)
     setDownloadResult(null)
+
+    const isTikTok = ['tiktok.com', 'douyin.com', 'v.douyin.com'].some(k => dlUrl.toLowerCase().includes(k))
+
+    // Helper to fetch directly from TikWM API
+    const fetchTikWM = async (url) => {
+      const res = await axios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(url.trim())}`)
+      if (res.data?.code === 0 && res.data?.data) {
+        const d = res.data.data
+        return {
+          title: d.title || 'Video TikTok Sạch Logo',
+          thumbnail: d.cover || '',
+          duration: d.duration || 0,
+          uploader: d.author?.nickname || 'TikTok Creator',
+          platform: 'TikTok (Sạch Logo)',
+          description: d.title || '',
+          url: url,
+          clean_video_url: d.play || d.hdplay,
+          hd_video_url: d.hdplay || d.play,
+          clean_audio_url: d.music,
+          isDirectClient: true
+        }
+      }
+      throw new Error(res.data?.msg || 'Không thể giải mã video TikTok từ liên kết này.')
+    }
+
     try {
-      const res = await axios.post('/api/media/info', { url: dlUrl })
-      setVideoInfo(res.data)
+      // Priority 1 for TikTok: Try direct TikWM API first (super fast, works seamlessly on Vercel without backend)
+      if (isTikTok) {
+        try {
+          const directData = await fetchTikWM(dlUrl)
+          setVideoInfo(directData)
+          return
+        } catch (tikwmErr) {
+          console.warn('TikWM direct resolution failed, trying backend...', tikwmErr)
+        }
+      }
+
+      // Priority 2: Backend resolution
+      try {
+        const res = await axios.post('/api/media/info', { url: dlUrl })
+        setVideoInfo(res.data)
+      } catch (backendErr) {
+        if (isTikTok) {
+          throw new Error('Không thể lấy thông tin video TikTok. Vui lòng kiểm tra lại link.')
+        }
+
+        if (backendErr.response?.status === 405 || backendErr.response?.status === 404 || !backendErr.response) {
+          throw new Error(
+            'Trên bản Web Vercel hiện tại, tính năng tải trực tiếp hỗ trợ siêu tốc TikTok/Douyin (Sạch Logo & Âm Thanh). ' +
+            'Để tải YouTube với chất lượng cao nhất, vui lòng khởi chạy Backend trên máy tính!'
+          )
+        }
+        throw backendErr
+      }
     } catch (err) {
-      alert(err.response?.data?.detail || 'Không thể lấy thông tin video. Vui lòng kiểm tra lại link.')
+      alert(err.response?.data?.detail || err.message || 'Không thể lấy thông tin video. Vui lòng kiểm tra lại link.')
     } finally {
       setDlLoading(false)
     }
@@ -56,13 +127,48 @@ export default function MediaStudio() {
   const handleDownload = async (formatType) => {
     setDlLoading(true)
     try {
-      const res = await axios.post('/api/media/download', {
-        url: dlUrl,
-        format_type: formatType
-      })
-      setDownloadResult(res.data)
+      const isAudio = formatType === 'audio'
+      const isHd = formatType === 'video_hd'
+      const directTargetUrl = isAudio 
+        ? videoInfo?.clean_audio_url 
+        : (isHd ? (videoInfo?.hd_video_url || videoInfo?.clean_video_url) : (videoInfo?.clean_video_url || videoInfo?.hd_video_url))
+
+      // If backend is running and we didn't resolve directly via client
+      if (!videoInfo?.isDirectClient) {
+        try {
+          const res = await axios.post('/api/media/download', {
+            url: dlUrl,
+            format_type: isAudio ? 'audio' : 'video'
+          })
+          setDownloadResult(res.data)
+          return
+        } catch (apiErr) {
+          if (!directTargetUrl) {
+            throw apiErr
+          }
+        }
+      }
+
+      // Direct client-side download
+      if (directTargetUrl) {
+        const ext = isAudio ? 'mp3' : 'mp4'
+        const safeTitle = (videoInfo.title || 'video')
+          .replace(/[\\/*?:"<>|]/g, '')
+          .slice(0, 40)
+          .trim() || 'video_clean'
+        const filename = `${safeTitle}_no_watermark.${ext}`
+
+        await triggerDirectDownload(directTargetUrl, filename)
+        setDownloadResult({
+          filename: filename,
+          download_url: directTargetUrl,
+          isDirect: true
+        })
+      } else {
+        throw new Error('Không tìm thấy link tải trực tiếp cho định dạng này.')
+      }
     } catch (err) {
-      alert(err.response?.data?.detail || 'Lỗi khi tải video')
+      alert(err.response?.data?.detail || err.message || 'Lỗi khi tải video')
     } finally {
       setDlLoading(false)
     }
@@ -211,19 +317,30 @@ export default function MediaStudio() {
                   <button
                     onClick={() => handleDownload('video')}
                     disabled={dlLoading}
-                    className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-purple-600/30"
+                    className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-purple-600/30 transition-all cursor-pointer"
                   >
                     <Download className="w-4 h-4" />
-                    <span>Tải Video MP4 (Sạch Logo)</span>
+                    <span>{dlLoading ? 'Đang tải...' : 'Tải Video MP4 (Sạch Logo)'}</span>
                   </button>
+
+                  {videoInfo.hd_video_url && videoInfo.hd_video_url !== videoInfo.clean_video_url && (
+                    <button
+                      onClick={() => handleDownload('video_hd')}
+                      disabled={dlLoading}
+                      className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      <span>{dlLoading ? 'Đang tải...' : 'Tải Bản Siêu Nét HD'}</span>
+                    </button>
+                  )}
 
                   <button
                     onClick={() => handleDownload('audio')}
                     disabled={dlLoading}
-                    className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-2"
+                    className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 text-xs font-bold flex items-center gap-2 transition-all cursor-pointer"
                   >
                     <Download className="w-4 h-4" />
-                    <span>Tải Âm Thanh MP3</span>
+                    <span>{dlLoading ? 'Đang tải...' : 'Tải Âm Thanh MP3'}</span>
                   </button>
                 </div>
               </div>
@@ -231,25 +348,24 @@ export default function MediaStudio() {
           )}
 
           {downloadResult && (
-            <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-3xl p-6 flex items-center justify-between gap-4 animate-in fade-in">
+            <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-3xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0">
                   <CheckCircle2 className="w-6 h-6" />
                 </div>
                 <div>
-                  <h4 className="font-bold text-sm text-white">Video đã được tải về máy thành công!</h4>
-                  <p className="text-xs text-emerald-400/90 font-mono mt-0.5">{downloadResult.filename}</p>
+                  <h4 className="font-bold text-sm text-white">Video đã sẵn sàng để tải về máy!</h4>
+                  <p className="text-xs text-emerald-400/90 font-mono mt-0.5 truncate max-w-xs md:max-w-md">{downloadResult.filename}</p>
                 </div>
               </div>
 
-              <a
-                href={downloadResult.download_url}
-                download
-                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-2"
+              <button
+                onClick={() => triggerDirectDownload(downloadResult.download_url, downloadResult.filename)}
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition-all cursor-pointer"
               >
                 <Download className="w-4 h-4" />
-                <span>Lưu Về Máy</span>
-              </a>
+                <span>Lưu Về Máy Ngay</span>
+              </button>
             </div>
           )}
         </div>
