@@ -331,6 +331,9 @@ export default function MobileConnect({ setCurrentTab }) {
   // =========================================================================
   // WEBRTC / PEERJS REAL-TIME ZERO-SERVER DIRECT TRANSFER
   // =========================================================================
+  // =========================================================================
+  // WEBRTC / PEERJS REAL-TIME ZERO-SERVER DIRECT TRANSFER
+  // =========================================================================
   const handleReceiveCompletedFile = useCallback(async (item, blob) => {
     const objUrl = blob ? URL.createObjectURL(blob) : (item.url || '')
     const fullItem = {
@@ -343,8 +346,14 @@ export default function MobileConnect({ setCurrentTab }) {
       await saveFileToIndexedDB(fullItem, blob)
     }
 
-    // Prepend to files list
-    setFiles(prev => [fullItem, ...(Array.isArray(prev) ? prev : [])])
+    // Prepend to files list with deduplication
+    setFiles(prev => {
+      const currentList = Array.isArray(prev) ? prev : []
+      if (currentList.some(f => f.id === fullItem.id || (f.filename === fullItem.filename && f.size === fullItem.size))) {
+        return currentList
+      }
+      return [fullItem, ...currentList]
+    })
 
     // Trigger celebration confetti on PC!
     try {
@@ -357,15 +366,26 @@ export default function MobileConnect({ setCurrentTab }) {
   }, [])
 
   const handleReceiveCompletedText = useCallback(async (item) => {
-    const blob = new Blob([item.text_content || ''], { type: 'text/plain;charset=utf-8' })
+    const rawText = item.text_content || ''
+    const isLink = item.is_link !== undefined ? item.is_link : (rawText.startsWith('http://') || rawText.startsWith('https://'))
+    const blob = new Blob([rawText], { type: 'text/plain;charset=utf-8' })
     const objUrl = URL.createObjectURL(blob)
     const fullItem = {
       ...item,
+      text_content: rawText,
+      is_link: isLink,
       url: objUrl
     }
 
     await saveFileToIndexedDB(fullItem, blob)
-    setFiles(prev => [fullItem, ...(Array.isArray(prev) ? prev : [])])
+
+    setFiles(prev => {
+      const currentList = Array.isArray(prev) ? prev : []
+      if (currentList.some(f => f.id === fullItem.id || (f.file_type === 'text' && f.text_content === fullItem.text_content))) {
+        return currentList
+      }
+      return [fullItem, ...currentList]
+    })
 
     try {
       confetti({
@@ -375,6 +395,37 @@ export default function MobileConnect({ setCurrentTab }) {
       })
     } catch (e) {}
   }, [])
+
+  // Auto-sync files from backend every 3 seconds when in PC Hub mode
+  useEffect(() => {
+    if (activeTab !== 'hub') return
+
+    const timer = setInterval(async () => {
+      try {
+        const res = await axios.get('/api/drop/files', { timeout: 2500 })
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          setFiles(prev => {
+            const currentList = Array.isArray(prev) ? prev : []
+            const currentIds = new Set(currentList.map(f => f.id || f.filename))
+            const newItems = res.data.filter(b => !currentIds.has(b.id) && !currentIds.has(b.filename))
+            if (newItems.length > 0) {
+              try {
+                confetti({
+                  particleCount: 35,
+                  spread: 55,
+                  origin: { y: 0.75 }
+                })
+              } catch (e) {}
+              return [...newItems, ...currentList]
+            }
+            return currentList
+          })
+        }
+      } catch (e) {}
+    }, 3000)
+
+    return () => clearInterval(timer)
+  }, [activeTab])
 
   // Initialize PC Receiver Peer
   useEffect(() => {
@@ -401,8 +452,15 @@ export default function MobileConnect({ setCurrentTab }) {
 
       currentPeer.on('connection', (conn) => {
         setP2pConnectedDevices(prev => prev + 1)
+        activeConnRef.current = conn
 
-        conn.on('data', async (data) => {
+        conn.on('data', async (rawPayload) => {
+          let data = rawPayload
+          if (typeof data === 'string') {
+            try {
+              data = JSON.parse(data)
+            } catch (e) {}
+          }
           if (!data || !data.type) return
 
           // 1. FILE START
@@ -427,22 +485,39 @@ export default function MobileConnect({ setCurrentTab }) {
             if (buffer) {
               const meta = buffer.metadata
               const blob = new Blob(buffer.chunks, { type: meta.mimeType || 'application/octet-stream' })
+
+              let textContent = meta.textContent || ''
+              if (!textContent && (meta.fileType === 'text' || (meta.mimeType && meta.mimeType.startsWith('text/')))) {
+                try {
+                  textContent = await blob.text()
+                } catch (e) {}
+              }
+
+              const isLink = meta.isLink !== undefined ? meta.isLink : (textContent.startsWith('http://') || textContent.startsWith('https://'))
+
               const item = {
                 id: meta.id || `file_${Date.now()}`,
                 filename: meta.name,
                 display_name: meta.name,
                 size: meta.size || blob.size,
-                size_formatted: formatBytes(meta.size || blob.size),
+                size_formatted: (meta.fileType === 'text' && textContent) ? `${textContent.length} ký tự` : formatBytes(meta.size || blob.size),
                 file_type: meta.fileType || getFileType(meta.name, meta.mimeType),
                 extension: (meta.name || '').split('.').pop() || '',
+                text_content: textContent,
+                is_link: isLink,
                 created_at: new Date().toISOString()
               }
 
-              await handleReceiveCompletedFile(item, blob)
+              if (item.file_type === 'text') {
+                await handleReceiveCompletedText(item)
+              } else {
+                await handleReceiveCompletedFile(item, blob)
+              }
+
               delete incomingBuffersRef.current[data.id]
 
               // Send ACK back to phone
-              conn.send({ type: 'FILE_ACK', id: meta.id, status: 'ok' })
+              try { conn.send({ type: 'FILE_ACK', id: meta.id, status: 'ok' }) } catch (e) {}
             }
           }
           // 4. DROP_TEXT (Text, notes, links)
@@ -466,7 +541,7 @@ export default function MobileConnect({ setCurrentTab }) {
             }
 
             await handleReceiveCompletedText(item)
-            conn.send({ type: 'TEXT_ACK', id: textId, status: 'ok' })
+            try { conn.send({ type: 'TEXT_ACK', id: textId, status: 'ok' }) } catch (e) {}
           }
         })
 
@@ -525,10 +600,70 @@ export default function MobileConnect({ setCurrentTab }) {
           activeConnRef.current = conn
         })
 
-        conn.on('data', async (data) => {
-          if (!data) return
-          // When PC sends text to Phone
-          if (data.type === 'DROP_TEXT') {
+        conn.on('data', async (rawPayload) => {
+          let data = rawPayload
+          if (typeof data === 'string') {
+            try { data = JSON.parse(data) } catch (e) {}
+          }
+          if (!data || !data.type) return
+
+          // 1. FILE START
+          if (data.type === 'FILE_START') {
+            incomingBuffersRef.current[data.id] = {
+              metadata: data,
+              chunks: [],
+              receivedBytes: 0
+            }
+          }
+          // 2. FILE CHUNK
+          else if (data.type === 'FILE_CHUNK') {
+            const buffer = incomingBuffersRef.current[data.id]
+            if (buffer) {
+              buffer.chunks.push(data.chunk)
+              buffer.receivedBytes += data.chunk.byteLength || 0
+            }
+          }
+          // 3. FILE END
+          else if (data.type === 'FILE_END') {
+            const buffer = incomingBuffersRef.current[data.id]
+            if (buffer) {
+              const meta = buffer.metadata
+              const blob = new Blob(buffer.chunks, { type: meta.mimeType || 'application/octet-stream' })
+
+              let textContent = meta.textContent || ''
+              if (!textContent && (meta.fileType === 'text' || (meta.mimeType && meta.mimeType.startsWith('text/')))) {
+                try {
+                  textContent = await blob.text()
+                } catch (e) {}
+              }
+
+              const isLink = meta.isLink !== undefined ? meta.isLink : (textContent.startsWith('http://') || textContent.startsWith('https://'))
+
+              const item = {
+                id: meta.id || `file_${Date.now()}`,
+                filename: meta.name,
+                display_name: meta.name,
+                size: meta.size || blob.size,
+                size_formatted: (meta.fileType === 'text' && textContent) ? `${textContent.length} ký tự` : formatBytes(meta.size || blob.size),
+                file_type: meta.fileType || getFileType(meta.name, meta.mimeType),
+                extension: (meta.name || '').split('.').pop() || '',
+                text_content: textContent,
+                is_link: isLink,
+                created_at: new Date().toISOString()
+              }
+
+              if (item.file_type === 'text') {
+                await handleReceiveCompletedText(item)
+              } else {
+                await handleReceiveCompletedFile(item, blob)
+              }
+
+              delete incomingBuffersRef.current[data.id]
+              try { conn.send({ type: 'FILE_ACK', id: meta.id, status: 'ok' }) } catch (e) {}
+            }
+          }
+          // 4. DROP_TEXT
+          else if (data.type === 'DROP_TEXT') {
             const rawText = data.text || ''
             const textId = data.id || `text_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
             const isLink = rawText.startsWith('http://') || rawText.startsWith('https://')
@@ -547,7 +682,7 @@ export default function MobileConnect({ setCurrentTab }) {
               created_at: data.created_at || new Date().toISOString()
             }
             await handleReceiveCompletedText(item)
-            conn.send({ type: 'TEXT_ACK', id: textId, status: 'ok' })
+            try { conn.send({ type: 'TEXT_ACK', id: textId, status: 'ok' }) } catch (e) {}
           }
         })
 
@@ -571,7 +706,7 @@ export default function MobileConnect({ setCurrentTab }) {
     } catch (e) {
       console.warn('Phone P2P init error:', e)
     }
-  }, [handleReceiveCompletedText])
+  }, [handleReceiveCompletedText, handleReceiveCompletedFile])
 
   // Auto-connect phone if target query param exists
   useEffect(() => {
@@ -584,8 +719,15 @@ export default function MobileConnect({ setCurrentTab }) {
   const isCloudEnv = networkInfo.is_cloud || window.location.protocol === 'https:'
   const effectivePcCode = pcPeerId.replace('study-', '') || pcRoomCode
 
-  // The QR code encodes direct link to mobile uploader with target room code
-  const qrTargetUrl = `${window.location.origin}/?tab=mobile&mode=drop&target=${effectivePcCode}`
+  // Resolve proper origin: on local machine, prefer local LAN IP over localhost so mobile phones can connect
+  const localHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
+  const isLocalHost = localHost === 'localhost' || localHost === '127.0.0.1'
+  const lanIp = selectedIp || networkInfo.local_ip || localHost
+  const resolvedOrigin = (!isCloudEnv && isLocalHost && lanIp && !lanIp.startsWith('127.'))
+    ? `http://${lanIp}:${networkInfo.frontend_port || (typeof window !== 'undefined' ? window.location.port : '5173')}`
+    : (typeof window !== 'undefined' ? window.location.origin : '')
+
+  const qrTargetUrl = `${resolvedOrigin}/?tab=mobile&mode=drop&target=${effectivePcCode}`
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(qrTargetUrl)
@@ -627,10 +769,11 @@ export default function MobileConnect({ setCurrentTab }) {
       const firstLine = rawText.split('\n')[0].trim()
       const title = customTitle || firstLine.slice(0, 30) || (isLink ? 'Đường link liên kết' : 'Ghi chú văn bản')
       const textId = `text_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
+      const safeFilename = `${title.replace(/[\\/*?:"<>|]/g, '_')}.txt`
 
       const item = {
         id: textId,
-        filename: `${title.replace(/[\\/*?:"<>|]/g, '_')}.txt`,
+        filename: safeFilename,
         display_name: title,
         size: rawText.length,
         size_formatted: `${rawText.length} ký tự`,
@@ -644,36 +787,87 @@ export default function MobileConnect({ setCurrentTab }) {
       const blob = new Blob([rawText], { type: 'text/plain;charset=utf-8' })
       item.url = URL.createObjectURL(blob)
 
-      // 1. Save locally
+      // 1. Save locally to IndexedDB & UI state
       await saveFileToIndexedDB(item, blob)
-      setFiles(prev => [item, ...(Array.isArray(prev) ? prev : [])])
+      setFiles(prev => {
+        const arr = Array.isArray(prev) ? prev : []
+        if (arr.some(f => f.id === item.id)) return arr
+        return [item, ...arr]
+      })
 
-      // 2. WebRTC DataChannel (if P2P connected)
+      let deliverySuccessful = false
+
+      // 2. WebRTC DataChannel (Direct P2P transmission)
       const conn = activeConnRef.current
       if (conn && conn.open) {
-        conn.send({
-          type: 'DROP_TEXT',
-          id: textId,
-          title: title,
-          text: rawText,
-          created_at: item.created_at
-        })
+        try {
+          // Strategy 1: Instant JSON DROP_TEXT message
+          conn.send({
+            type: 'DROP_TEXT',
+            id: textId,
+            title: title,
+            text: rawText,
+            created_at: item.created_at
+          })
+
+          // Strategy 2: Robust chunked file pipeline (identical to photos)
+          conn.send({
+            type: 'FILE_START',
+            id: textId,
+            name: safeFilename,
+            size: blob.size,
+            fileType: 'text',
+            mimeType: 'text/plain;charset=utf-8',
+            textContent: rawText,
+            isLink: isLink
+          })
+
+          const textBuffer = await blob.arrayBuffer()
+          const CHUNK_SIZE = 64 * 1024
+          let offset = 0
+          while (offset < textBuffer.byteLength) {
+            const slice = textBuffer.slice(offset, offset + CHUNK_SIZE)
+            conn.send({
+              type: 'FILE_CHUNK',
+              id: textId,
+              chunk: slice
+            })
+            offset += CHUNK_SIZE
+          }
+
+          conn.send({
+            type: 'FILE_END',
+            id: textId
+          })
+
+          deliverySuccessful = true
+        } catch (webrtcErr) {
+          console.warn('WebRTC text send error:', webrtcErr)
+        }
       }
 
-      // 3. BroadcastChannel (for other tabs)
+      // 3. BroadcastChannel (for other tabs on same device)
       if (broadcastChannelRef.current) {
-        broadcastChannelRef.current.postMessage({
-          type: 'NEW_TEXT',
-          item: item
-        })
+        try {
+          broadcastChannelRef.current.postMessage({
+            type: 'NEW_TEXT',
+            item: item
+          })
+          deliverySuccessful = true
+        } catch (bcErr) {}
       }
 
       // 4. Background sync to local backend if online
       try {
-        axios.post('/api/drop/text', { text: rawText, title: title }, { timeout: 3000 }).catch(() => {})
-      } catch (e) {}
+        const res = await axios.post('/api/drop/text', { text: rawText, title: title }, { timeout: 3500 })
+        if (res.data && res.data.status === 'success') {
+          deliverySuccessful = true
+        }
+      } catch (backendErr) {
+        // Local server offline or cloud mode
+      }
 
-      return true
+      return deliverySuccessful || !!(conn && conn.open)
     } finally {
       setSendingText(false)
     }
@@ -1547,6 +1741,9 @@ export default function MobileConnect({ setCurrentTab }) {
                       setMobileInputText('')
                       setUploadSuccessMsg('✅ Đã bắn văn bản sang màn hình máy tính thành công!')
                       setTimeout(() => setUploadSuccessMsg(''), 4000)
+                    } else {
+                      setUploadSuccessMsg('⚠️ Chưa kết nối được với PC. Vui lòng quét mã QR hoặc nhập mã kết nối.')
+                      setTimeout(() => setUploadSuccessMsg(''), 5000)
                     }
                   }}
                   className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:from-slate-800 disabled:to-slate-800 text-white font-black text-sm shadow-xl shadow-emerald-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"

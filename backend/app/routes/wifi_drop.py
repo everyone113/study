@@ -110,6 +110,7 @@ async def list_dropped_files():
             # Parse original name from timestamp_prefix_name
             name_parts = entry.name.split("_", 2)
             display_name = name_parts[-1] if len(name_parts) >= 3 else entry.name
+            clean_display = re.sub(r'^\d+_', '', display_name)
 
             text_content = ""
             is_link = False
@@ -118,13 +119,16 @@ async def list_dropped_files():
                     with open(entry, "r", encoding="utf-8", errors="ignore") as tf:
                         text_content = tf.read()
                         is_link = text_content.startswith("http://") or text_content.startswith("https://")
+                        first_line = text_content.split("\n")[0].strip()
+                        if first_line:
+                            clean_display = first_line[:35]
                 except Exception:
                     pass
 
             files.append({
                 "id": entry.name,
                 "filename": entry.name,
-                "display_name": display_name,
+                "display_name": clean_display,
                 "size": stat.st_size,
                 "size_formatted": f"{len(text_content)} ký tự" if file_type == "text" and text_content else format_size(stat.st_size),
                 "modified_at": stat.st_mtime,
