@@ -23,8 +23,6 @@ export function AuthProvider({ children }) {
   })
 
   const isGuest = !currentUser
-
-  // Active User ID (either usr_... or 'guest')
   const activeUserId = currentUser ? currentUser.id : 'guest'
 
   /**
@@ -83,7 +81,6 @@ export function AuthProvider({ children }) {
       } else {
         localStorage.removeItem(SESSION_KEY)
       }
-      // Broadcast user change event to inform all views to reload their data state
       window.dispatchEvent(new CustomEvent('studymedia:user_changed', { detail: { user: currentUser } }))
     } catch (e) {}
   }, [currentUser])
@@ -111,6 +108,113 @@ export function AuthProvider({ children }) {
   }
 
   /**
+   * Generate an instant portable cross-device sync URL with QR Code data.
+   */
+  const generateSyncUrl = useCallback(() => {
+    if (!currentUser) return null
+    try {
+      const payload = {
+        v: 1,
+        user: currentUser,
+        vault: {
+          academic_subjects: getVaultItem('academic_subjects', []),
+          gpa_summary: getVaultItem('gpa_summary', null),
+          notes: getVaultItem('notes', []),
+          documents: getVaultItem('documents', []),
+          flashcards: getVaultItem('flashcards', [])
+        },
+        ts: Date.now()
+      }
+      const jsonStr = JSON.stringify(payload)
+      const b64 = btoa(unescape(encodeURIComponent(jsonStr)))
+      const baseUrl = window.location.origin + window.location.pathname
+      return `${baseUrl}?syncToken=${b64}`
+    } catch (e) {
+      console.error('Generate sync URL error:', e)
+      return null
+    }
+  }, [currentUser, getVaultItem])
+
+  /**
+   * Generate a raw Sync Token string (for copying/pasting across devices).
+   */
+  const generateSyncToken = useCallback(() => {
+    if (!currentUser) return null
+    try {
+      const payload = {
+        v: 1,
+        user: currentUser,
+        vault: {
+          academic_subjects: getVaultItem('academic_subjects', []),
+          gpa_summary: getVaultItem('gpa_summary', null),
+          notes: getVaultItem('notes', []),
+          documents: getVaultItem('documents', []),
+          flashcards: getVaultItem('flashcards', [])
+        },
+        ts: Date.now()
+      }
+      return btoa(unescape(encodeURIComponent(JSON.stringify(payload))))
+    } catch (e) {
+      return null
+    }
+  }, [currentUser, getVaultItem])
+
+  /**
+   * Import a sync token string into active device.
+   */
+  const importSyncToken = useCallback((tokenOrUrl) => {
+    try {
+      let rawToken = tokenOrUrl.trim()
+      if (rawToken.includes('syncToken=')) {
+        rawToken = rawToken.split('syncToken=')[1].split('&')[0]
+      }
+      const decodedJson = decodeURIComponent(escape(atob(rawToken)))
+      const payload = JSON.parse(decodedJson)
+
+      if (payload && payload.user) {
+        const u = payload.user
+        setCurrentUser(u)
+        localStorage.setItem(SESSION_KEY, JSON.stringify(u))
+
+        if (payload.vault) {
+          Object.keys(payload.vault).forEach(key => {
+            const val = payload.vault[key]
+            if (val !== undefined && val !== null) {
+              localStorage.setItem(
+                `studymedia_vault_${u.id}_${key}`,
+                typeof val === 'string' ? val : JSON.stringify(val)
+              )
+            }
+          })
+        }
+        window.dispatchEvent(new CustomEvent('studymedia:user_changed', { detail: { user: u } }))
+        return { success: true, user: u }
+      }
+      return { success: false, message: 'Dữ liệu mã đồng bộ không đúng định dạng.' }
+    } catch (err) {
+      console.error('Import sync token error:', err)
+      return { success: false, message: 'Mã đồng bộ không hợp lệ. Vui lòng kiểm tra lại.' }
+    }
+  }, [])
+
+  // Auto-detect and process ?syncToken=... in URL on mount
+  useEffect(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search)
+      const syncToken = urlParams.get('syncToken')
+      if (syncToken) {
+        const res = importSyncToken(syncToken)
+        if (res.success) {
+          const cleanUrl = window.location.origin + window.location.pathname
+          window.history.replaceState({}, document.title, cleanUrl)
+        }
+      }
+    } catch (e) {
+      console.warn('URL Sync Token error:', e)
+    }
+  }, [importSyncToken])
+
+  /**
    * Register new account.
    */
   const register = async ({ name, email, password, studentId = '', migrateGuestData = true }) => {
@@ -123,7 +227,7 @@ export function AuthProvider({ children }) {
         email: cleanEmail,
         password,
         student_id: studentId
-      }, { timeout: 4000 })
+      }, { timeout: 3500 })
 
       if (res.data?.success && res.data.user) {
         newUser = res.data.user
@@ -144,12 +248,22 @@ export function AuthProvider({ children }) {
     }
 
     if (newUser) {
+      // Save to local device registry
+      try {
+        const regRaw = localStorage.getItem(LOCAL_USERS_KEY)
+        const registry = regRaw ? JSON.parse(regRaw) : {}
+        registry[cleanEmail] = {
+          user: newUser,
+          pwd: password
+        }
+        localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(registry))
+      } catch (e) {}
+
       if (migrateGuestData) {
         migrateGuestDataToUser(newUser.id)
       }
       setCurrentUser(newUser)
       setAuthModalOpen(false)
-      // Push initial sync
       setTimeout(() => syncCloudData(newUser.id), 500)
       return { success: true, user: newUser }
     }
@@ -161,24 +275,47 @@ export function AuthProvider({ children }) {
    */
   const login = async ({ email, password }) => {
     const cleanEmail = email.trim().toLowerCase()
+
+    // 1. Try API login first (if backend server is reachable)
     try {
       const res = await axios.post('/api/auth/login', {
         email: cleanEmail,
         password
-      }, { timeout: 4000 })
+      }, { timeout: 3500 })
 
       if (res.data?.success && res.data.user) {
         const loggedUser = res.data.user
         setCurrentUser(loggedUser)
         setAuthModalOpen(false)
-        // Pull latest updates from cloud
         setTimeout(() => pullCloudData(loggedUser.id), 500)
         return { success: true, user: loggedUser }
       }
     } catch (err) {
-      const errMsg = err.response?.data?.detail || 'Không thể đăng nhập. Vui lòng kiểm tra lại email và mật khẩu.'
-      throw new Error(errMsg)
+      console.warn('API Login unavailable, checking local device registry:', err)
     }
+
+    // 2. Check local accounts registry on this device
+    try {
+      const regRaw = localStorage.getItem(LOCAL_USERS_KEY)
+      if (regRaw) {
+        const registry = JSON.parse(regRaw)
+        const record = registry[cleanEmail]
+        if (record && record.pwd === password) {
+          setCurrentUser(record.user)
+          setAuthModalOpen(false)
+          return { success: true, user: record.user }
+        } else if (record && record.pwd !== password) {
+          throw new Error('Mật khẩu không chính xác cho tài khoản này.')
+        }
+      }
+    } catch (localErr) {
+      if (localErr.message.includes('Mật khẩu không chính xác')) {
+        throw localErr
+      }
+    }
+
+    // 3. If account not found on this device and backend is offline:
+    throw new Error('Tài khoản này được tạo trên máy tính khác. Vui lòng mở máy tính bấm "📱 Đồng bộ sang Điện thoại" và quét mã QR hoặc dán mã đồng bộ!')
   }
 
   /**
@@ -194,7 +331,7 @@ export function AuthProvider({ children }) {
         name: name.trim(),
         avatar,
         google_id: googleId
-      }, { timeout: 4000 })
+      }, { timeout: 3500 })
 
       if (res.data?.success && res.data.user) {
         gUser = res.data.user
@@ -219,7 +356,6 @@ export function AuthProvider({ children }) {
       }
       setCurrentUser(gUser)
       setAuthModalOpen(false)
-      // Pull or push cloud data
       setTimeout(() => pullCloudData(gUser.id), 500)
       return { success: true, user: gUser }
     }
@@ -264,7 +400,7 @@ export function AuthProvider({ children }) {
       setSyncStatus('synced')
     } catch (err) {
       console.warn('Cloud sync push warning (offline or server asleep):', err)
-      setSyncStatus('synced') // Don't alarm user when local vault is intact
+      setSyncStatus('synced')
     }
   }
 
@@ -299,7 +435,6 @@ export function AuthProvider({ children }) {
         if (Array.isArray(flashcards) && flashcards.length > 0) {
           localStorage.setItem(`studymedia_vault_${uid}_flashcards`, JSON.stringify(flashcards))
         }
-        // Notify components to update
         window.dispatchEvent(new CustomEvent('studymedia:user_changed', { detail: { user: currentUser } }))
       }
 
@@ -340,6 +475,9 @@ export function AuthProvider({ children }) {
         logout,
         syncCloudData,
         pullCloudData,
+        generateSyncUrl,
+        generateSyncToken,
+        importSyncToken,
         getVaultKey,
         getVaultItem,
         setVaultItem

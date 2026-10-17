@@ -13,12 +13,24 @@ import {
   AlertCircle,
   Cloud,
   ArrowRight,
-  ShieldCheck
+  ShieldCheck,
+  QrCode,
+  Smartphone,
+  KeyRound
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 export default function AuthModal() {
-  const { authModalOpen, closeAuthModal, authModalInitialTab, login, register, loginWithGoogle } = useAuth()
+  const {
+    authModalOpen,
+    closeAuthModal,
+    authModalInitialTab,
+    login,
+    register,
+    loginWithGoogle,
+    importSyncToken
+  } = useAuth()
+
   const [tab, setTab] = useState(authModalInitialTab || 'login')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -37,6 +49,9 @@ export default function AuthModal() {
   const [showGooglePrompt, setShowGooglePrompt] = useState(false)
   const [googleCustomEmail, setGoogleCustomEmail] = useState('')
   const [googleCustomName, setGoogleCustomName] = useState('')
+
+  // Sync token input state
+  const [syncInput, setSyncInput] = useState('')
 
   if (!authModalOpen) return null
 
@@ -89,7 +104,7 @@ export default function AuthModal() {
         migrateGuestData: migrateData
       })
       if (res?.success) {
-        setSuccessMsg('Đăng ký thành công! Đang đồng bộ không gian làm việc...')
+        setSuccessMsg('Đăng ký thành công! Đang chuẩn bị không gian làm việc...')
       }
     } catch (err) {
       setErrorMsg(err.response?.data?.detail || err.message || 'Đăng ký không thành công.')
@@ -125,6 +140,24 @@ export default function AuthModal() {
     await handleGoogleQuickSelect(googleCustomEmail, cleanGName)
   }
 
+  const handleSyncSubmit = (e) => {
+    e.preventDefault()
+    if (!syncInput.trim()) {
+      setErrorMsg('Vui lòng dán mã đồng bộ hoặc đường link từ máy tính.')
+      return
+    }
+    setLoading(true)
+    setErrorMsg('')
+    const res = importSyncToken(syncInput.trim())
+    setLoading(false)
+    if (res.success) {
+      setSuccessMsg('🎉 Đồng bộ tài khoản thành công! Toàn bộ bảng điểm và ghi chú đã xuất hiện trên điện thoại.')
+      setTimeout(() => closeAuthModal(), 1200)
+    } else {
+      setErrorMsg(res.message || 'Mã đồng bộ không hợp lệ. Vui lòng kiểm tra lại.')
+    }
+  }
+
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
@@ -146,17 +179,21 @@ export default function AuthModal() {
             <X className="w-4 h-4" />
           </button>
 
-          <div className="p-6 sm:p-8">
+          <div className="p-6 sm:p-8 max-h-[90vh] overflow-y-auto no-scrollbar">
             {/* Top Branding */}
-            <div className="text-center mb-6">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white shadow-lg shadow-blue-500/30 mb-3">
+            <div className="text-center mb-5">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white shadow-lg shadow-blue-500/30 mb-2.5">
                 <GraduationCap className="w-6 h-6" />
               </div>
               <h3 className="text-xl font-bold text-white tracking-tight">
-                {tab === 'login' ? 'Đăng Nhập Tài Khoản' : 'Đăng Ký Tài Khoản Mới'}
+                {tab === 'login'
+                  ? 'Đăng Nhập Tài Khoản'
+                  : tab === 'register'
+                  ? 'Đăng Ký Tài Khoản Mới'
+                  : 'Đồng Bộ Từ Máy Tính'}
               </h3>
               <p className="text-xs text-slate-400 mt-1">
-                Đồng bộ bảng điểm, ghi chú và tài liệu cá nhân lên đám mây
+                Đồng bộ bảng điểm, ghi chú và tài liệu cá nhân đa thiết bị
               </p>
             </div>
 
@@ -165,10 +202,10 @@ export default function AuthModal() {
               <button
                 type="button"
                 onClick={() => setShowGooglePrompt(true)}
-                className="w-full mb-5 py-3 px-4 rounded-2xl bg-white hover:bg-slate-100 text-slate-900 font-semibold text-sm flex items-center justify-center gap-3 shadow-md hover:shadow-lg transition-all active:scale-[0.98] cursor-pointer"
+                className="w-full mb-4 py-2.5 px-4 rounded-2xl bg-white hover:bg-slate-100 text-slate-900 font-semibold text-xs flex items-center justify-center gap-3 shadow-md hover:shadow-lg transition-all active:scale-[0.98] cursor-pointer"
               >
                 {/* Official Google G Logo SVG */}
-                <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                   <path
                     fill="#4285F4"
                     d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -193,12 +230,12 @@ export default function AuthModal() {
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
-                className="mb-5 p-4 rounded-2xl bg-slate-800/90 border border-blue-500/40"
+                className="mb-4 p-3.5 rounded-2xl bg-slate-800/90 border border-blue-500/40"
               >
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center justify-between mb-2.5">
                   <span className="text-xs font-bold text-white flex items-center gap-1.5">
                     <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                    <span>Chọn tài khoản Google của bạn</span>
+                    <span>Chọn tài khoản Google</span>
                   </span>
                   <button
                     type="button"
@@ -238,15 +275,15 @@ export default function AuthModal() {
             )}
 
             {/* Divider */}
-            <div className="relative flex items-center justify-center my-4">
+            <div className="relative flex items-center justify-center my-3.5">
               <div className="border-t border-slate-800 w-full" />
-              <span className="bg-slate-900 px-3 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                hoặc dùng Email
+              <span className="bg-slate-900 px-3 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                hoặc phương thức khác
               </span>
             </div>
 
-            {/* Tabs Switcher */}
-            <div className="flex rounded-xl bg-slate-800/80 p-1 mb-5 border border-slate-700/60">
+            {/* Tabs Switcher: 3 Tabs (Đăng Nhập, Đăng Ký, Đồng Bộ Máy Tính) */}
+            <div className="flex rounded-xl bg-slate-800/80 p-1 mb-4 border border-slate-700/60">
               <button
                 type="button"
                 onClick={() => handleTabChange('login')}
@@ -269,6 +306,18 @@ export default function AuthModal() {
               >
                 Đăng Ký
               </button>
+              <button
+                type="button"
+                onClick={() => handleTabChange('sync')}
+                className={`flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${
+                  tab === 'sync'
+                    ? 'bg-emerald-600 text-white shadow-md'
+                    : 'text-emerald-400 hover:text-emerald-300'
+                }`}
+              >
+                <Smartphone className="w-3 h-3" />
+                <span>Mã Máy Tính</span>
+              </button>
             </div>
 
             {/* Error Message */}
@@ -276,10 +325,10 @@ export default function AuthModal() {
               <motion.div
                 initial={{ opacity: 0, y: -6 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2"
+                className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2 leading-relaxed"
               >
-                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
-                <span>{errorMsg}</span>
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+                <div>{errorMsg}</div>
               </motion.div>
             )}
 
@@ -295,9 +344,9 @@ export default function AuthModal() {
               </motion.div>
             )}
 
-            {/* Tab: ĐĂNG NHẬP */}
-            {tab === 'login' ? (
-              <form onSubmit={handleEmailLogin} className="space-y-3.5">
+            {/* Tab 1: ĐĂNG NHẬP */}
+            {tab === 'login' && (
+              <form onSubmit={handleEmailLogin} className="space-y-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-300 mb-1">Email</label>
                   <div className="relative">
@@ -342,9 +391,16 @@ export default function AuthModal() {
                 >
                   {loading ? 'Đang xác thực...' : 'Đăng Nhập'}
                 </button>
+
+                {/* Helpful Hint for Phone Users */}
+                <div className="mt-3 p-2.5 rounded-xl bg-blue-950/40 border border-blue-800/50 text-[11px] text-blue-300 leading-relaxed text-center">
+                  💡 <strong>Đang dùng điện thoại?</strong> Hãy mở máy tính $\rightarrow$ bấm ảnh đại diện $\rightarrow$ <strong>"Đồng bộ sang Điện thoại"</strong> để quét mã QR đăng nhập trong 2 giây!
+                </div>
               </form>
-            ) : (
-              /* Tab: ĐĂNG KÝ */
+            )}
+
+            {/* Tab 2: ĐĂNG KÝ */}
+            {tab === 'register' && (
               <form onSubmit={handleEmailRegister} className="space-y-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-300 mb-1">Họ và tên</label>
@@ -410,7 +466,6 @@ export default function AuthModal() {
                   </div>
                 </div>
 
-                {/* Data Migration Checkbox */}
                 <label className="flex items-start gap-2 pt-1 cursor-pointer select-none">
                   <input
                     type="checkbox"
@@ -433,8 +488,47 @@ export default function AuthModal() {
               </form>
             )}
 
+            {/* Tab 3: ĐỒNG BỘ TỪ MÁY TÍNH (MÃ TOKEN HOẶC LINK) */}
+            {tab === 'sync' && (
+              <form onSubmit={handleSyncSubmit} className="space-y-3.5">
+                <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs leading-relaxed">
+                  📱 <strong>Nhập mã đồng bộ từ máy tính:</strong> Trên máy tính đã đăng nhập, bấm vào Avatar $\rightarrow$ chọn <strong>"Đồng bộ sang Điện thoại"</strong> $\rightarrow$ bấm <em>"Sao chép mã đồng bộ"</em> rồi dán vào ô bên dưới!
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                    Dán mã đồng bộ hoặc đường link từ máy tính
+                  </label>
+                  <div className="relative">
+                    <KeyRound className="w-4 h-4 text-emerald-400 absolute left-3.5 top-3" />
+                    <textarea
+                      value={syncInput}
+                      onChange={(e) => setSyncInput(e.target.value)}
+                      placeholder="Dán mã đồng bộ bắt đầu bằng eyJ... hoặc link https://... vào đây"
+                      rows={3}
+                      required
+                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700 text-white text-xs font-mono placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 resize-none"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Smartphone className="w-4 h-4" />
+                  <span>Kích Hoạt Đăng Nhập & Đồng Bộ Ngay</span>
+                </button>
+
+                <p className="text-[11px] text-slate-400 text-center leading-normal">
+                  Hoặc bạn có thể mở <strong>Camera điện thoại</strong> quét trực tiếp mã QR trên màn hình máy tính để đăng nhập ngay mà không cần dán mã!
+                </p>
+              </form>
+            )}
+
             {/* Cloud Sync Assurance */}
-            <div className="mt-5 pt-4 border-t border-slate-800/80 flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
+            <div className="mt-4 pt-3.5 border-t border-slate-800/80 flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
               <Cloud className="w-3.5 h-3.5 text-blue-400" />
               <span>Dữ liệu được mã hóa và gắn mã định danh cá nhân</span>
             </div>
