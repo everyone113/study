@@ -49,16 +49,19 @@ export function getSafeUploadFileName(fileName) {
 // Determine file category
 export function getFileType(fileName = '', mimeType = '') {
   const ext = (fileName || '').split('.').pop().toLowerCase()
-  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'heic', 'heif'].includes(ext) || mimeType.startsWith('image/')) {
+  if (['txt', 'md', 'json', 'log', 'text'].includes(ext) || (mimeType && mimeType.startsWith('text/'))) {
+    return 'text'
+  }
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'heic', 'heif'].includes(ext) || (mimeType && mimeType.startsWith('image/'))) {
     return 'image'
   }
-  if (['mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v'].includes(ext) || mimeType.startsWith('video/')) {
+  if (['mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v'].includes(ext) || (mimeType && mimeType.startsWith('video/'))) {
     return 'video'
   }
-  if (['mp3', 'wav', 'm4a', 'flac', 'aac', 'ogg'].includes(ext) || mimeType.startsWith('audio/')) {
+  if (['mp3', 'wav', 'm4a', 'flac', 'aac', 'ogg'].includes(ext) || (mimeType && mimeType.startsWith('audio/'))) {
     return 'audio'
   }
-  if (['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'txt', 'zip', 'rar'].includes(ext) || mimeType.includes('pdf')) {
+  if (['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'zip', 'rar'].includes(ext) || (mimeType && mimeType.includes('pdf'))) {
     return 'document'
   }
   return 'other'
@@ -107,6 +110,8 @@ async function saveFileToIndexedDB(item, blob) {
       file_type: item.file_type,
       extension: item.extension,
       created_at: item.created_at,
+      text_content: item.text_content || '',
+      is_link: !!item.is_link,
       blob: blob
     })
   } catch (e) {
@@ -124,7 +129,9 @@ async function loadFilesFromIndexedDB() {
         const list = req.result || []
         const withUrls = list.map(item => ({
           ...item,
-          url: item.blob ? URL.createObjectURL(item.blob) : (item.url || '')
+          url: item.blob ? URL.createObjectURL(item.blob) : (item.url || ''),
+          text_content: item.text_content || '',
+          is_link: !!item.is_link
         }))
         withUrls.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
         resolve(withUrls)
@@ -202,7 +209,15 @@ export default function MobileConnect({ setCurrentTab }) {
   // Received files in WiFi Drop (Guaranteed Array)
   const [files, setFiles] = useState([])
   const [loadingFiles, setLoadingFiles] = useState(false)
-  const [fileFilter, setFileFilter] = useState('all') // 'all' | 'image' | 'video' | 'document'
+  const [fileFilter, setFileFilter] = useState('all') // 'all' | 'image' | 'video' | 'text' | 'document'
+
+  // Text & Note Drop States
+  const [mobileMode, setMobileMode] = useState('files') // 'files' | 'text'
+  const [mobileInputText, setMobileInputText] = useState('')
+  const [pcInputText, setPcInputText] = useState('')
+  const [copiedTextId, setCopiedTextId] = useState(null)
+  const [textModalItem, setTextModalItem] = useState(null)
+  const [sendingText, setSendingText] = useState(false)
 
   // Modals
   const [previewFile, setPreviewFile] = useState(null)
@@ -239,6 +254,8 @@ export default function MobileConnect({ setCurrentTab }) {
         bc.onmessage = (e) => {
           if (e.data && e.data.type === 'NEW_FILE' && e.data.item) {
             handleReceiveCompletedFile(e.data.item, e.data.blob)
+          } else if (e.data && e.data.type === 'NEW_TEXT' && e.data.item) {
+            handleReceiveCompletedText(e.data.item)
           }
         }
         broadcastChannelRef.current = bc
@@ -339,6 +356,26 @@ export default function MobileConnect({ setCurrentTab }) {
     } catch (e) {}
   }, [])
 
+  const handleReceiveCompletedText = useCallback(async (item) => {
+    const blob = new Blob([item.text_content || ''], { type: 'text/plain;charset=utf-8' })
+    const objUrl = URL.createObjectURL(blob)
+    const fullItem = {
+      ...item,
+      url: objUrl
+    }
+
+    await saveFileToIndexedDB(fullItem, blob)
+    setFiles(prev => [fullItem, ...(Array.isArray(prev) ? prev : [])])
+
+    try {
+      confetti({
+        particleCount: 30,
+        spread: 50,
+        origin: { y: 0.75 }
+      })
+    } catch (e) {}
+  }, [])
+
   // Initialize PC Receiver Peer
   useEffect(() => {
     if (activeTab !== 'hub') return
@@ -408,6 +445,29 @@ export default function MobileConnect({ setCurrentTab }) {
               conn.send({ type: 'FILE_ACK', id: meta.id, status: 'ok' })
             }
           }
+          // 4. DROP_TEXT (Text, notes, links)
+          else if (data.type === 'DROP_TEXT') {
+            const rawText = data.text || ''
+            const textId = data.id || `text_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
+            const isLink = rawText.startsWith('http://') || rawText.startsWith('https://')
+            const firstLine = rawText.split('\n')[0].trim()
+            const title = data.title || firstLine.slice(0, 30) || (isLink ? 'Đường link liên kết' : 'Ghi chú văn bản')
+            const item = {
+              id: textId,
+              filename: `${title.replace(/[\\/*?:"<>|]/g, '_')}.txt`,
+              display_name: title,
+              size: rawText.length,
+              size_formatted: `${rawText.length} ký tự`,
+              file_type: 'text',
+              extension: 'txt',
+              text_content: rawText,
+              is_link: isLink,
+              created_at: data.created_at || new Date().toISOString()
+            }
+
+            await handleReceiveCompletedText(item)
+            conn.send({ type: 'TEXT_ACK', id: textId, status: 'ok' })
+          }
         })
 
         conn.on('close', () => {
@@ -433,7 +493,7 @@ export default function MobileConnect({ setCurrentTab }) {
         if (currentPeer) currentPeer.destroy()
       } catch (e) {}
     }
-  }, [activeTab, pcRoomCode, handleReceiveCompletedFile])
+  }, [activeTab, pcRoomCode, handleReceiveCompletedFile, handleReceiveCompletedText])
 
   // Initialize Phone Uploader Peer & Connect to PC
   const connectPhoneToPc = useCallback((targetCode) => {
@@ -465,6 +525,32 @@ export default function MobileConnect({ setCurrentTab }) {
           activeConnRef.current = conn
         })
 
+        conn.on('data', async (data) => {
+          if (!data) return
+          // When PC sends text to Phone
+          if (data.type === 'DROP_TEXT') {
+            const rawText = data.text || ''
+            const textId = data.id || `text_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
+            const isLink = rawText.startsWith('http://') || rawText.startsWith('https://')
+            const firstLine = rawText.split('\n')[0].trim()
+            const title = data.title || firstLine.slice(0, 30) || (isLink ? 'Đường link liên kết' : 'Ghi chú văn bản')
+            const item = {
+              id: textId,
+              filename: `${title.replace(/[\\/*?:"<>|]/g, '_')}.txt`,
+              display_name: title,
+              size: rawText.length,
+              size_formatted: `${rawText.length} ký tự`,
+              file_type: 'text',
+              extension: 'txt',
+              text_content: rawText,
+              is_link: isLink,
+              created_at: data.created_at || new Date().toISOString()
+            }
+            await handleReceiveCompletedText(item)
+            conn.send({ type: 'TEXT_ACK', id: textId, status: 'ok' })
+          }
+        })
+
         conn.on('close', () => {
           setPhoneConnectedToPc(false)
           activeConnRef.current = null
@@ -485,7 +571,7 @@ export default function MobileConnect({ setCurrentTab }) {
     } catch (e) {
       console.warn('Phone P2P init error:', e)
     }
-  }, [])
+  }, [handleReceiveCompletedText])
 
   // Auto-connect phone if target query param exists
   useEffect(() => {
@@ -505,6 +591,92 @@ export default function MobileConnect({ setCurrentTab }) {
     navigator.clipboard.writeText(qrTargetUrl)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  // Copy text to clipboard helper
+  const handleCopyText = (text, id) => {
+    if (!text) return
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedTextId(id)
+      setTimeout(() => setCopiedTextId(null), 2000)
+    }).catch(() => {
+      window.prompt('Sao chép thủ công:', text)
+    })
+  }
+
+  // Paste from clipboard helper
+  const handlePasteToText = async (setter) => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        const clip = await navigator.clipboard.readText()
+        if (clip) setter(clip)
+      }
+    } catch (e) {
+      console.warn('Clipboard read failed:', e)
+    }
+  }
+
+  // Send text (bidirectional: phone -> PC or PC -> phone)
+  const handleSendText = async (textToSend, customTitle = '') => {
+    const rawText = (textToSend || '').trim()
+    if (!rawText) return false
+    setSendingText(true)
+
+    try {
+      const isLink = rawText.startsWith('http://') || rawText.startsWith('https://')
+      const firstLine = rawText.split('\n')[0].trim()
+      const title = customTitle || firstLine.slice(0, 30) || (isLink ? 'Đường link liên kết' : 'Ghi chú văn bản')
+      const textId = `text_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
+
+      const item = {
+        id: textId,
+        filename: `${title.replace(/[\\/*?:"<>|]/g, '_')}.txt`,
+        display_name: title,
+        size: rawText.length,
+        size_formatted: `${rawText.length} ký tự`,
+        file_type: 'text',
+        extension: 'txt',
+        text_content: rawText,
+        is_link: isLink,
+        created_at: new Date().toISOString()
+      }
+
+      const blob = new Blob([rawText], { type: 'text/plain;charset=utf-8' })
+      item.url = URL.createObjectURL(blob)
+
+      // 1. Save locally
+      await saveFileToIndexedDB(item, blob)
+      setFiles(prev => [item, ...(Array.isArray(prev) ? prev : [])])
+
+      // 2. WebRTC DataChannel (if P2P connected)
+      const conn = activeConnRef.current
+      if (conn && conn.open) {
+        conn.send({
+          type: 'DROP_TEXT',
+          id: textId,
+          title: title,
+          text: rawText,
+          created_at: item.created_at
+        })
+      }
+
+      // 3. BroadcastChannel (for other tabs)
+      if (broadcastChannelRef.current) {
+        broadcastChannelRef.current.postMessage({
+          type: 'NEW_TEXT',
+          item: item
+        })
+      }
+
+      // 4. Background sync to local backend if online
+      try {
+        axios.post('/api/drop/text', { text: rawText, title: title }, { timeout: 3000 }).catch(() => {})
+      } catch (e) {}
+
+      return true
+    } finally {
+      setSendingText(false)
+    }
   }
 
   // Handle files selected on mobile
@@ -923,6 +1095,45 @@ export default function MobileConnect({ setCurrentTab }) {
                   <span>{pcUploading ? 'Đang thêm...' : 'Chọn Tệp Từ PC'}</span>
                 </button>
               </div>
+
+              {/* PC Quick Text Sender (Bắn văn bản / link tới điện thoại) */}
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/40 to-teal-950/40 border border-emerald-500/30 space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-emerald-400" />
+                    <span>Gửi văn bản hoặc liên kết tới điện thoại</span>
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => handlePasteToText(setPcInputText)}
+                    className="text-[11px] text-teal-400 hover:text-teal-300 font-semibold flex items-center gap-1 cursor-pointer"
+                  >
+                    <Copy className="w-3 h-3" />
+                    <span>Dán từ clipboard</span>
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <textarea
+                    rows={2}
+                    placeholder="Gõ hoặc dán đoạn văn bản, ghi chú, mã code hoặc liên kết URL cần bắn sang điện thoại..."
+                    value={pcInputText}
+                    onChange={(e) => setPcInputText(e.target.value)}
+                    className="flex-1 bg-slate-950 border border-slate-700/80 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 resize-none font-mono"
+                  />
+                  <button
+                    type="button"
+                    disabled={sendingText || !pcInputText.trim()}
+                    onClick={async () => {
+                      const ok = await handleSendText(pcInputText)
+                      if (ok) setPcInputText('')
+                    }}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white rounded-xl text-xs font-bold flex flex-col items-center justify-center gap-1 shadow-lg shadow-emerald-600/30 transition-all cursor-pointer flex-shrink-0"
+                  >
+                    <Send className={`w-4 h-4 ${sendingText ? 'animate-bounce' : ''}`} />
+                    <span>Bắn đi</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -952,7 +1163,7 @@ export default function MobileConnect({ setCurrentTab }) {
               {/* Filter pills & Clean button */}
               <div className="flex flex-wrap items-center gap-2">
                 <div className="flex bg-slate-800 p-1 rounded-xl text-xs font-medium">
-                  {['all', 'image', 'video', 'document'].map(f => (
+                  {['all', 'image', 'video', 'text', 'document'].map(f => (
                     <button
                       key={f}
                       onClick={() => setFileFilter(f)}
@@ -960,7 +1171,7 @@ export default function MobileConnect({ setCurrentTab }) {
                         fileFilter === f ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'
                       }`}
                     >
-                      {f === 'all' ? 'Tất cả' : f === 'image' ? 'Ảnh' : f === 'video' ? 'Video' : 'Tài liệu'}
+                      {f === 'all' ? 'Tất cả' : f === 'image' ? 'Ảnh' : f === 'video' ? 'Video' : f === 'text' ? 'Văn bản' : 'Tài liệu'}
                     </button>
                   ))}
                 </div>
@@ -993,9 +1204,38 @@ export default function MobileConnect({ setCurrentTab }) {
                     key={file.id || file.filename}
                     className="group bg-slate-950/80 border border-slate-800/80 hover:border-emerald-500/50 rounded-2xl overflow-hidden shadow-lg transition-all duration-300 flex flex-col justify-between animate-in fade-in zoom-in-95"
                   >
-                    {/* Media Preview Box */}
+                    {/* Media / Text Preview Box */}
                     <div className="relative aspect-square bg-slate-900 flex items-center justify-center overflow-hidden">
-                      {file.file_type === 'image' ? (
+                      {file.file_type === 'text' ? (
+                        <div
+                          onClick={() => setTextModalItem(file)}
+                          className="w-full h-full p-3 flex flex-col justify-between bg-gradient-to-b from-slate-900 to-slate-950 text-left select-none cursor-pointer group-hover:border-emerald-500/30 transition-all"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold ${file.is_link ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'}`}>
+                              {file.is_link ? <Link className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
+                              <span>{file.is_link ? 'Link' : 'Văn bản'}</span>
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-mono">
+                              {file.size_formatted}
+                            </span>
+                          </div>
+
+                          <div className="my-auto py-1">
+                            <p className="text-xs text-slate-300 font-mono leading-relaxed line-clamp-4 break-words bg-slate-950/80 p-2 rounded-xl border border-slate-800/80">
+                              {file.text_content || file.display_name}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-1 text-[11px] text-slate-400">
+                            <span className="text-[10px] text-slate-500">Chạm để xem</span>
+                            <span className="text-emerald-400 font-bold flex items-center gap-1">
+                              <Copy className="w-3 h-3" />
+                              <span>Sao chép</span>
+                            </span>
+                          </div>
+                        </div>
+                      ) : file.file_type === 'image' ? (
                         <img
                           src={file.url}
                           alt={file.display_name}
@@ -1048,6 +1288,33 @@ export default function MobileConnect({ setCurrentTab }) {
 
                       {/* Action buttons */}
                       <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-1">
+                        {file.file_type === 'text' && (
+                          <button
+                            type="button"
+                            onClick={() => handleCopyText(file.text_content || file.display_name, file.id)}
+                            title="Sao chép văn bản"
+                            className={`p-1.5 rounded-lg text-xs font-bold transition-all ${
+                              copiedTextId === file.id
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            }`}
+                          >
+                            {copiedTextId === file.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        )}
+
+                        {file.is_link && (
+                          <a
+                            href={file.text_content}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Mở liên kết"
+                            className="p-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+
                         <a
                           href={file.url}
                           download={file.display_name}
@@ -1170,38 +1437,128 @@ export default function MobileConnect({ setCurrentTab }) {
               </div>
             )}
 
-            {/* Giant Picker Button */}
-            <input
-              type="file"
-              multiple
-              accept="image/*,video/*,application/pdf"
-              ref={mobileInputRef}
-              onChange={handleMobileFileChange}
-              className="hidden"
-            />
+            {/* Mode Switch: Files vs Text */}
+            <div className="flex bg-slate-950 p-1.5 rounded-2xl border border-slate-800 text-xs font-bold gap-1">
+              <button
+                type="button"
+                onClick={() => setMobileMode('files')}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all cursor-pointer ${
+                  mobileMode === 'files'
+                    ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <ImageIcon className="w-4 h-4" />
+                <span>Kho Ảnh & Video</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMobileMode('text')}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all cursor-pointer ${
+                  mobileMode === 'text'
+                    ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <FileText className="w-4 h-4" />
+                <span>Văn Bản & Link</span>
+              </button>
+            </div>
 
-            <button
-              type="button"
-              onClick={() => mobileInputRef.current?.click()}
-              className="w-full py-8 px-6 rounded-3xl border-2 border-dashed border-emerald-500/40 hover:border-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10 transition-all flex flex-col items-center justify-center gap-3 group text-center"
-            >
-              <div className="w-16 h-16 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-xl shadow-emerald-600/30 group-hover:scale-110 transition-transform">
-                <ImageIcon className="w-8 h-8" />
+            {/* MODE 1: FILES & MEDIA */}
+            {mobileMode === 'files' && (
+              <>
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*,video/*,application/pdf"
+                  ref={mobileInputRef}
+                  onChange={handleMobileFileChange}
+                  className="hidden"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => mobileInputRef.current?.click()}
+                  className="w-full py-8 px-6 rounded-3xl border-2 border-dashed border-emerald-500/40 hover:border-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10 transition-all flex flex-col items-center justify-center gap-3 group text-center cursor-pointer"
+                >
+                  <div className="w-16 h-16 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-xl shadow-emerald-600/30 group-hover:scale-110 transition-transform">
+                    <ImageIcon className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <span className="font-extrabold text-base text-white block">
+                      {selectedMobileFiles.length > 0
+                        ? `Đã chọn ${selectedMobileFiles.length} tệp (Chạm để chọn lại)`
+                        : '📸 Chạm Để Mở Kho Ảnh / Chọn Video'}
+                    </span>
+                    <span className="text-xs text-slate-400 block mt-1">
+                      Hỗ trợ Ảnh JPG, PNG, Live Photo, Video MP4, Tài liệu PDF
+                    </span>
+                  </div>
+                </button>
+              </>
+            )}
+
+            {/* MODE 2: TEXT & NOTES & LINKS */}
+            {mobileMode === 'text' && (
+              <div className="space-y-4 animate-in fade-in">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-emerald-400" />
+                    <span>Nội dung văn bản, ghi chú hoặc link cần bắn:</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handlePasteToText(setMobileInputText)}
+                    className="text-xs text-teal-400 hover:text-teal-300 font-bold flex items-center gap-1 bg-teal-500/10 px-2.5 py-1 rounded-lg border border-teal-500/20 cursor-pointer"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Dán từ Clipboard</span>
+                  </button>
+                </div>
+
+                <textarea
+                  rows={5}
+                  value={mobileInputText}
+                  onChange={(e) => setMobileInputText(e.target.value)}
+                  placeholder="Dán hoặc nhập đoạn văn bản, ghi chú học tập, mã code, mật khẩu hoặc liên kết URL để bắn ngay lên màn hình PC..."
+                  className="w-full bg-slate-950 border border-slate-700 rounded-2xl p-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 resize-none font-mono leading-relaxed"
+                />
+
+                <div className="flex items-center justify-between text-xs text-slate-500 font-mono">
+                  <span>{mobileInputText.length} ký tự</span>
+                  {mobileInputText && (
+                    <button
+                      type="button"
+                      onClick={() => setMobileInputText('')}
+                      className="text-red-400 hover:text-red-300 text-xs cursor-pointer"
+                    >
+                      Xóa trắng
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  disabled={sendingText || !mobileInputText.trim()}
+                  onClick={async () => {
+                    const ok = await handleSendText(mobileInputText)
+                    if (ok) {
+                      setMobileInputText('')
+                      setUploadSuccessMsg('✅ Đã bắn văn bản sang màn hình máy tính thành công!')
+                      setTimeout(() => setUploadSuccessMsg(''), 4000)
+                    }
+                  }}
+                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:from-slate-800 disabled:to-slate-800 text-white font-black text-sm shadow-xl shadow-emerald-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <Send className={`w-5 h-5 ${sendingText ? 'animate-bounce' : ''}`} />
+                  <span>{sendingText ? 'Đang bắn văn bản sang PC...' : '🚀 Bắn Văn Bản Lên Màn Hình PC Ngay'}</span>
+                </button>
               </div>
-              <div>
-                <span className="font-extrabold text-base text-white block">
-                  {selectedMobileFiles.length > 0
-                    ? `Đã chọn ${selectedMobileFiles.length} tệp (Chạm để chọn lại)`
-                    : '📸 Chạm Để Mở Kho Ảnh / Chọn Video'}
-                </span>
-                <span className="text-xs text-slate-400 block mt-1">
-                  Hỗ trợ Ảnh JPG, PNG, Live Photo, Video MP4, Tài liệu PDF
-                </span>
-              </div>
-            </button>
+            )}
 
             {/* Previews of selected photos */}
-            {mobilePreviews.length > 0 && (
+            {mobileMode === 'files' && mobilePreviews.length > 0 && (
               <div className="space-y-3 bg-slate-950 p-4 rounded-2xl border border-slate-800">
                 <div className="flex items-center justify-between text-xs font-bold text-slate-300">
                   <span>Ảnh & Video đã chọn ({mobilePreviews.length})</span>
@@ -1334,6 +1691,72 @@ export default function MobileConnect({ setCurrentTab }) {
                 <Download className="w-4 h-4" />
                 <span>Tải Về Máy Tính</span>
               </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL: TEXT VIEWER / COPIER LIGHTBOX */}
+      {/* ======================================================== */}
+      {textModalItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in">
+          <div className="relative max-w-2xl w-full bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-emerald-400" />
+                <span className="font-bold text-sm text-white truncate max-w-sm">{textModalItem.display_name}</span>
+                <span className="text-xs text-slate-400 font-mono">({textModalItem.size_formatted})</span>
+              </div>
+              <button
+                onClick={() => setTextModalItem(null)}
+                className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto bg-slate-950/80">
+              <pre className="text-xs text-slate-200 font-mono whitespace-pre-wrap break-words leading-relaxed select-all">
+                {textModalItem.text_content || textModalItem.display_name}
+              </pre>
+            </div>
+
+            <div className="p-4 border-t border-slate-800 flex items-center justify-between bg-slate-900">
+              {textModalItem.is_link ? (
+                <a
+                  href={textModalItem.text_content}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-blue-600/30"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Mở liên kết</span>
+                </a>
+              ) : <div></div>}
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleCopyText(textModalItem.text_content, textModalItem.id)}
+                  className={`px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+                    copiedTextId === textModalItem.id
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30'
+                  }`}
+                >
+                  {copiedTextId === textModalItem.id ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  <span>{copiedTextId === textModalItem.id ? 'Đã sao chép!' : 'Sao chép văn bản'}</span>
+                </button>
+                <a
+                  href={textModalItem.url}
+                  download={textModalItem.filename || 'van_ban.txt'}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center gap-1.5"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Tải file .txt</span>
+                </a>
+              </div>
             </div>
           </div>
         </div>
