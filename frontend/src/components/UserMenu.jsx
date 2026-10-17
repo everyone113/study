@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { QRCodeSVG } from 'qrcode.react'
 import {
@@ -278,76 +279,87 @@ export default function UserMenu({ isMobile = false }) {
         </AnimatePresence>
       </div>
 
-      {/* Cross-Device QR Synchronization Modal */}
+      {/* Cross-Device QR Synchronization Modal - Rendered to body via createPortal so it is 100% centered and NEVER clipped by sticky header */}
       <AnimatePresence>
-        {showQrModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
+        {showQrModal && typeof document !== 'undefined' && createPortal(
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowQrModal(false)}
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto"
+          >
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              initial={{ opacity: 0, scale: 0.9, y: 0 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-sm bg-slate-900 border border-slate-700/80 rounded-3xl shadow-2xl p-6 text-center ring-1 ring-white/10"
+              exit={{ opacity: 0, scale: 0.9, y: 0 }}
+              transition={{ type: 'spring', stiffness: 450, damping: 28 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-sm my-auto bg-slate-900 border border-slate-700/90 rounded-3xl shadow-[0_25px_70px_rgba(0,0,0,0.95)] p-5 sm:p-6 text-center ring-1 ring-white/10"
             >
+              {/* Close Button */}
               <button
                 onClick={() => setShowQrModal(false)}
-                className="absolute top-4 right-4 p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                className="absolute top-4 right-4 p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
 
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 mb-3">
-                <Smartphone className="w-6 h-6" />
+              <div className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 mb-2.5">
+                <Smartphone className="w-5 h-5" />
               </div>
 
               <h3 className="text-base font-bold text-white tracking-tight">
                 Đồng Bộ Sang Điện Thoại
               </h3>
-              <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto leading-relaxed">
-                Mở <strong className="text-emerald-400">Camera điện thoại</strong> hoặc ứng dụng <strong className="text-blue-400">Zalo</strong> quét mã QR này để tự động đăng nhập & chuyển toàn bộ dữ liệu ngay lập tức!
+              <p className="text-xs text-slate-300 mt-1 max-w-xs mx-auto leading-relaxed">
+                Mở <strong className="text-emerald-400 font-bold">Camera điện thoại</strong> hoặc <strong className="text-blue-400 font-bold">Zalo</strong> quét mã QR này để tự động đăng nhập & chuyển dữ liệu ngay lập tức!
               </p>
 
               {/* QR Code Container */}
-              <div className="my-5 p-4 bg-white rounded-2xl inline-block shadow-xl">
+              <div className="my-4 p-3.5 bg-white rounded-2xl inline-block shadow-2xl ring-4 ring-emerald-500/20">
                 {syncUrl ? (
                   <QRCodeSVG
                     value={syncUrl}
-                    size={200}
+                    size={175}
                     bgColor="#ffffff"
                     fgColor="#0f172a"
                     level="L"
                   />
                 ) : (
-                  <div className="w-[200px] h-[200px] flex items-center justify-center text-slate-800 text-xs">
+                  <div className="w-[175px] h-[175px] flex items-center justify-center text-slate-800 text-xs">
                     Đang tạo mã...
                   </div>
                 )}
               </div>
 
-              {/* Or Copy Token Link */}
+              {/* Copy Token Button */}
               <div className="space-y-2">
                 <button
+                  type="button"
                   onClick={handleCopyToken}
-                  className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors flex items-center justify-center gap-2 border border-slate-700"
+                  className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 text-xs font-semibold transition-all flex items-center justify-center gap-2 border border-slate-700 cursor-pointer active:scale-98"
                 >
                   {copiedToken ? (
                     <>
-                      <Check className="w-4 h-4 text-emerald-400" />
-                      <span className="text-emerald-400">Đã sao chép mã đồng bộ!</span>
+                      <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span className="text-emerald-400 font-bold">Đã sao chép mã đồng bộ!</span>
                     </>
                   ) : (
                     <>
-                      <Copy className="w-4 h-4 text-slate-400" />
+                      <Copy className="w-4 h-4 text-slate-400 shrink-0" />
                       <span>Sao chép mã đồng bộ (gửi qua tin nhắn)</span>
                     </>
                   )}
                 </button>
               </div>
 
-              <p className="text-[11px] text-slate-500 mt-4 leading-normal">
-                Sau khi quét hoặc nhập mã trên điện thoại, toàn bộ bảng điểm GPA, lịch thi và tài liệu sẽ xuất hiện ngay!
+              <p className="text-[11px] text-slate-400 mt-3 leading-normal">
+                Toàn bộ bảng điểm GPA, lịch thi và tài liệu sẽ được đồng bộ sang điện thoại ngay khi mở link!
               </p>
             </motion.div>
-          </div>
+          </motion.div>,
+          document.body
         )}
       </AnimatePresence>
     </>
