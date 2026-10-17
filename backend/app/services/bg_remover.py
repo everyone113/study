@@ -26,6 +26,7 @@ def get_rembg_session():
     return _rembg_session if _rembg_session is not False else None
 
 def remove_background(image_bytes: bytes, original_filename: str) -> dict:
+    t0 = time.time()
     stem = Path(original_filename).stem
     out_filename = f"nobg_{stem}_{int(time.time())}_{uuid.uuid4().hex[:6]}.png"
     out_path = PROCESSED_DIR / out_filename
@@ -71,11 +72,23 @@ def remove_background(image_bytes: bytes, original_filename: str) -> dict:
     base64_data = base64.b64encode(result_bytes).decode("ascii")
     data_url = f"data:image/png;base64,{base64_data}"
 
+    # Extract dimensions
+    try:
+        out_img = Image.open(io.BytesIO(result_bytes))
+        width, height = out_img.size
+    except Exception:
+        width, height = None, None
+
+    elapsed = round(time.time() - t0, 2)
+
     return {
         "status": "success",
         "original_filename": original_filename,
         "result_filename": out_filename,
         "result_url": f"/static/processed/{out_filename}",
         "data_url": data_url,
+        "width": width,
+        "height": height,
+        "elapsed_seconds": elapsed,
         "file_size": len(result_bytes)
     }
