@@ -193,7 +193,7 @@ export default function UserMenu({ isMobile = false }) {
             <div className="text-[10px] text-slate-400 flex items-center gap-1">
               <span className="font-mono text-cyan-400">#{currentUser.id.replace('usr_', '')}</span>
               <span>•</span>
-              <span className="text-emerald-400 font-medium">Đã đồng bộ</span>
+              <span className="text-emerald-400 font-medium">Tài khoản</span>
             </div>
           </div>
 
@@ -247,21 +247,25 @@ export default function UserMenu({ isMobile = false }) {
                 </button>
               </div>
 
-              {/* Instant Cross-Device Sync Button (QR Code) */}
+              {/* Instant Cross-Device Sync Button */}
               <div className="mt-3">
                 <button
                   onClick={() => {
                     setMenuOpen(false)
-                    setShowQrModal(true)
+                    if (isMobile) {
+                      openAuthModal('sync')
+                    } else {
+                      setShowQrModal(true)
+                    }
                   }}
                   className="w-full flex items-center justify-between px-3 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600/20 to-teal-600/20 border border-emerald-500/40 text-emerald-300 hover:text-white hover:bg-emerald-600/30 transition-all font-semibold text-xs cursor-pointer shadow-sm"
                 >
                   <div className="flex items-center gap-2">
-                    <QrCode className="w-4 h-4 text-emerald-400" />
-                    <span>Đồng bộ sang Điện thoại</span>
+                    {isMobile ? <Smartphone className="w-4 h-4 text-emerald-400" /> : <QrCode className="w-4 h-4 text-emerald-400" />}
+                    <span>{isMobile ? 'Nhập mã đồng bộ từ Máy tính' : 'Đồng bộ sang Điện thoại'}</span>
                   </div>
                   <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded-md font-bold">
-                    Mã QR
+                    {isMobile ? 'Nhập mã' : 'Mã QR'}
                   </span>
                 </button>
               </div>

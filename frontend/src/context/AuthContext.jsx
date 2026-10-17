@@ -45,15 +45,21 @@ export function AuthProvider({ children }) {
       const val = localStorage.getItem(vaultKey)
       if (val !== null) return JSON.parse(val)
 
-      // Fallback: If in guest mode, check legacy key (e.g. 'studymedia_academic_subjects')
-      if (!currentUser) {
-        const legacyVal = localStorage.getItem(`studymedia_${baseKey}`)
-        if (legacyVal !== null) {
-          const parsed = JSON.parse(legacyVal)
-          // Copy to guest vault
-          localStorage.setItem(vaultKey, legacyVal)
-          return parsed
+      // Fallback: Check guest vault or legacy key (e.g. 'studymedia_academic_subjects')
+      const guestVal = localStorage.getItem(`studymedia_vault_guest_${baseKey}`)
+      if (guestVal !== null) {
+        if (currentUser?.id) {
+          localStorage.setItem(vaultKey, guestVal)
         }
+        return JSON.parse(guestVal)
+      }
+
+      const legacyVal = localStorage.getItem(`studymedia_${baseKey}`)
+      if (legacyVal !== null) {
+        if (currentUser?.id) {
+          localStorage.setItem(vaultKey, legacyVal)
+        }
+        return JSON.parse(legacyVal)
       }
     } catch (e) {}
     return defaultValue
@@ -126,41 +132,36 @@ export function AuthProvider({ children }) {
         }
       } catch (e) {}
 
-      // Keep QR payload light (< 400 chars) so QR Code is 100% reliable, fast to scan, and NEVER overflows
+      // Compact subjects into array format [code, name, credits, score] (< 25 bytes per subject)
       const subjects = getVaultItem('academic_subjects', [])
       const gpa = getVaultItem('gpa_summary', null)
 
-      const safeAvatar = (currentUser.avatar && currentUser.avatar.startsWith('http') && currentUser.avatar.length < 150)
-        ? currentUser.avatar
-        : undefined
-
       let compactSubs = undefined
       if (Array.isArray(subjects) && subjects.length > 0) {
-        compactSubs = subjects.slice(0, 8).map(s => {
-          let g = null
+        compactSubs = subjects.slice(0, 30).map(s => {
+          let score = null
           if (typeof s.grade === 'object' && s.grade !== null) {
-            g = s.grade.total_score_10 ?? s.grade.gpa_4 ?? null
+            score = s.grade.total_score_10 ?? s.grade.gpa_4 ?? null
           } else if (typeof s.final_grade === 'number' || typeof s.final_grade === 'string') {
-            g = s.final_grade
+            score = s.final_grade
           }
-          return {
-            id: s.id,
-            c: s.code,
-            n: s.name ? s.name.slice(0, 20) : '',
-            cr: s.credits,
-            g: g
-          }
+          return [
+            s.code || '',
+            (s.name || '').slice(0, 30),
+            Number(s.credits) || 3,
+            score
+          ]
         })
       }
 
       let compactGpa = undefined
       if (gpa) {
-        compactGpa = {
-          g4: gpa.gpa_4,
-          g10: gpa.gpa_10,
-          cr: gpa.total_credits || gpa.credits,
-          cl: gpa.classification
-        }
+        compactGpa = [
+          Number(gpa.gpa_4) || 0,
+          Number(gpa.gpa_10) || 0,
+          Number(gpa.total_credits || gpa.credits) || 0,
+          gpa.classification || 'Khá'
+        ]
       }
 
       let qrPayload = {
@@ -169,7 +170,6 @@ export function AuthProvider({ children }) {
           id: currentUser.id,
           e: currentUser.email,
           n: currentUser.name,
-          a: safeAvatar,
           s: currentUser.student_id,
           p: currentUser.provider || 'email'
         },
@@ -179,12 +179,7 @@ export function AuthProvider({ children }) {
         t: Date.now()
       }
 
-      let jsonStr = JSON.stringify(qrPayload)
-      if (jsonStr.length > 800) {
-        delete qrPayload.subs
-        jsonStr = JSON.stringify(qrPayload)
-      }
-
+      const jsonStr = JSON.stringify(qrPayload)
       const b64 = btoa(unescape(encodeURIComponent(jsonStr)))
       let baseUrl = window.location.origin + window.location.pathname
       if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
@@ -276,29 +271,54 @@ export function AuthProvider({ children }) {
         // Save subjects
         if (payload.subs && Array.isArray(payload.subs)) {
           const restoredSubs = payload.subs.map(s => {
+            if (Array.isArray(s)) {
+              return {
+                id: `sub_${Math.random().toString(36).substr(2, 6)}`,
+                code: s[0] || '',
+                name: s[1] || '',
+                credits: Number(s[2]) || 3,
+                final_grade: s[3],
+                grade: typeof s[3] === 'number' ? { total_score_10: s[3] } : null
+              }
+            }
             const finalGrade = s.g !== undefined ? s.g : (s.final_grade || s.grade || null)
             return {
               id: s.id || `sub_${Math.random().toString(36).substr(2, 6)}`,
               code: s.c || s.code,
               name: s.n || s.name,
-              credits: s.cr || s.credits || 3,
+              credits: Number(s.cr || s.credits) || 3,
               final_grade: finalGrade,
               grade: typeof finalGrade === 'number' ? { total_score_10: finalGrade } : (s.grade || null)
             }
           })
           localStorage.setItem(`studymedia_vault_${user.id}_academic_subjects`, JSON.stringify(restoredSubs))
+          localStorage.setItem('studymedia_academic_subjects', JSON.stringify(restoredSubs))
         }
 
         // Save GPA
         if (payload.gpa) {
-          const restoredGpa = payload.gpa.g4 !== undefined ? {
-            gpa_4: payload.gpa.g4,
-            gpa_10: payload.gpa.g10,
-            total_credits: payload.gpa.cr || 0,
-            graded_credits: payload.gpa.cr || 0,
-            classification: payload.gpa.cl || 'Khá'
-          } : payload.gpa
+          let restoredGpa = null
+          if (Array.isArray(payload.gpa)) {
+            restoredGpa = {
+              gpa_4: Number(payload.gpa[0]) || 0,
+              gpa_10: Number(payload.gpa[1]) || 0,
+              total_credits: Number(payload.gpa[2]) || 0,
+              graded_credits: Number(payload.gpa[2]) || 0,
+              classification: payload.gpa[3] || 'Khá'
+            }
+          } else if (payload.gpa.g4 !== undefined) {
+            restoredGpa = {
+              gpa_4: payload.gpa.g4,
+              gpa_10: payload.gpa.g10,
+              total_credits: payload.gpa.cr || 0,
+              graded_credits: payload.gpa.cr || 0,
+              classification: payload.gpa.cl || 'Khá'
+            }
+          } else {
+            restoredGpa = payload.gpa
+          }
           localStorage.setItem(`studymedia_vault_${user.id}_gpa_summary`, JSON.stringify(restoredGpa))
+          localStorage.setItem('studymedia_gpa_summary', JSON.stringify(restoredGpa))
         }
 
         // Support full vault (v1)
@@ -306,10 +326,9 @@ export function AuthProvider({ children }) {
           Object.keys(payload.vault).forEach(key => {
             const val = payload.vault[key]
             if (val !== undefined && val !== null) {
-              localStorage.setItem(
-                `studymedia_vault_${user.id}_${key}`,
-                typeof val === 'string' ? val : JSON.stringify(val)
-              )
+              const strVal = typeof val === 'string' ? val : JSON.stringify(val)
+              localStorage.setItem(`studymedia_vault_${user.id}_${key}`, strVal)
+              localStorage.setItem(`studymedia_${key}`, strVal)
             }
           })
         }
