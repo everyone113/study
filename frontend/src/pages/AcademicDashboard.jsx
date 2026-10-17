@@ -18,6 +18,7 @@ import {
   Sparkles,
   Info
 } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 
 // Calculation helpers
 function calculateGradeDetails(score10) {
@@ -88,32 +89,21 @@ const PRESET_COLORS = [
 ]
 
 export default function AcademicDashboard() {
-  // Load initially from localStorage so page NEVER renders blank
+  const { getVaultItem, setVaultItem, currentUser, activeUserId, syncCloudData } = useAuth()
+
+  // Load initially from active user vault so page NEVER renders blank and NEVER collides with other users
   const [subjects, setSubjects] = useState(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY)
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        if (Array.isArray(parsed)) return parsed
-      }
-    } catch (e) {}
-    return []
+    return getVaultItem('academic_subjects', [])
   })
 
   const [gpaSummary, setGpaSummary] = useState(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_GPA_KEY)
-      if (saved) {
-        return JSON.parse(saved)
-      }
-    } catch (e) {}
-    return {
+    return getVaultItem('gpa_summary', {
       total_credits: 0,
       graded_credits: 0,
       gpa_10: 0.0,
       gpa_4: 0.0,
       classification: 'Chưa có điểm'
-    }
+    })
   })
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -122,6 +112,18 @@ export default function AcademicDashboard() {
   const [editingGradeSub, setEditingGradeSub] = useState(null)
   const [loading, setLoading] = useState(false)
   const [serverConnected, setServerConnected] = useState(false)
+
+  // Reload state automatically when switching user accounts
+  useEffect(() => {
+    const handleUserChanged = () => {
+      const currentSubs = getVaultItem('academic_subjects', [])
+      setSubjects(currentSubs)
+      const currentGpa = getVaultItem('gpa_summary', computeLocalGpaSummary(currentSubs))
+      setGpaSummary(currentGpa)
+    }
+    window.addEventListener('studymedia:user_changed', handleUserChanged)
+    return () => window.removeEventListener('studymedia:user_changed', handleUserChanged)
+  }, [getVaultItem])
 
   // Form states
   const [newSub, setNewSub] = useState({
@@ -144,22 +146,21 @@ export default function AcademicDashboard() {
     weight_final: 0.6
   })
 
-  // Synchronize state changes to localStorage
+  // Synchronize state changes to isolated user vault & trigger cloud sync
   const saveSubjectsLocally = (newList) => {
     setSubjects(newList)
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newList))
-    } catch (e) {}
+    setVaultItem('academic_subjects', newList)
     const newSummary = computeLocalGpaSummary(newList)
     setGpaSummary(newSummary)
-    try {
-      localStorage.setItem(LOCAL_GPA_KEY, JSON.stringify(newSummary))
-    } catch (e) {}
+    setVaultItem('gpa_summary', newSummary)
+    if (currentUser) {
+      setTimeout(() => syncCloudData(), 1200)
+    }
   }
 
   useEffect(() => {
     fetchAcademicData()
-  }, [])
+  }, [activeUserId])
 
   const fetchAcademicData = async () => {
     setLoading(true)

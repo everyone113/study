@@ -21,6 +21,7 @@ import {
   FileCode,
   FileSpreadsheet
 } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 
 // Safe file name extractor (OpenHands pattern: workspace-upload-path.ts)
 export function getSafeUploadFileName(fileName) {
@@ -120,25 +121,34 @@ function getLocalDocuments() {
   }
 }
 
-function persistLocalDocuments(docs) {
-  try {
-    localStorage.setItem(LOCAL_DOCS_KEY, JSON.stringify(docs))
-  } catch (e) {}
-}
-
 export default function DocumentLibrary() {
-  // Always initialize with guaranteed array
-  const [documents, setDocuments] = useState(getLocalDocuments)
-  const [subjects, setSubjects] = useState(() => {
-    try {
-      const cached = localStorage.getItem('studymedia_academic_subjects')
-      if (cached) {
-        const parsed = JSON.parse(cached)
-        if (Array.isArray(parsed)) return parsed
-      }
-    } catch (e) {}
-    return []
+  const { getVaultItem, setVaultItem, currentUser, activeUserId, syncCloudData } = useAuth()
+
+  // Always initialize with guaranteed array from user-isolated vault
+  const [documents, setDocuments] = useState(() => {
+    return getVaultItem('documents', DEFAULT_STUDY_DOCS)
   })
+  const [subjects, setSubjects] = useState(() => {
+    return getVaultItem('academic_subjects', [])
+  })
+
+  // Reload state automatically when switching user accounts
+  useEffect(() => {
+    const handleUserChanged = () => {
+      setDocuments(getVaultItem('documents', DEFAULT_STUDY_DOCS))
+      setSubjects(getVaultItem('academic_subjects', []))
+    }
+    window.addEventListener('studymedia:user_changed', handleUserChanged)
+    return () => window.removeEventListener('studymedia:user_changed', handleUserChanged)
+  }, [getVaultItem])
+
+  const persistLocalDocuments = (docs) => {
+    setDocuments(docs)
+    setVaultItem('documents', docs)
+    if (currentUser) {
+      setTimeout(() => syncCloudData(), 1200)
+    }
+  }
 
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')

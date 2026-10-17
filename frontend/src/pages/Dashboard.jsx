@@ -29,6 +29,7 @@ import {
   Zap,
   RotateCcw
 } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 
 // Kho Tàng Triết Học Học Tập (Xoay chuyển mỗi 30s)
 // Kết hợp Triết học Mác - Lênin, Khắc kỷ (Stoicism), Hiện sinh và Triết học Phương Đông - Tây
@@ -162,35 +163,30 @@ export const PHILOSOPHY_QUOTES = [
 ]
 
 export default function Dashboard({ setCurrentTab }) {
+  const { getVaultItem, currentUser, activeUserId } = useAuth()
+
   const [gpaSummary, setGpaSummary] = useState(() => {
-    try {
-      const cached = localStorage.getItem('studymedia_gpa_summary')
-      if (cached) return JSON.parse(cached)
-    } catch (e) {}
-    return { gpa_4: 0, gpa_10: 0, total_credits: 0, graded_credits: 0, classification: 'Chưa có điểm' }
+    return getVaultItem('gpa_summary', { gpa_4: 0, gpa_10: 0, total_credits: 0, graded_credits: 0, classification: 'Chưa có điểm' })
   })
 
   const [subjects, setSubjects] = useState(() => {
-    try {
-      const cached = localStorage.getItem('studymedia_academic_subjects')
-      if (cached) {
-        const parsed = JSON.parse(cached)
-        if (Array.isArray(parsed)) return parsed
-      }
-    } catch (e) {}
-    return []
+    return getVaultItem('academic_subjects', [])
   })
 
   const [notes, setNotes] = useState(() => {
-    try {
-      const cached = localStorage.getItem('studymedia_notes')
-      if (cached) {
-        const parsed = JSON.parse(cached)
-        if (Array.isArray(parsed)) return parsed
-      }
-    } catch (e) {}
-    return []
+    return getVaultItem('notes', [])
   })
+
+  // Reload state automatically when switching user accounts
+  useEffect(() => {
+    const handleUserChanged = () => {
+      setGpaSummary(getVaultItem('gpa_summary', { gpa_4: 0, gpa_10: 0, total_credits: 0, graded_credits: 0, classification: 'Chưa có điểm' }))
+      setSubjects(getVaultItem('academic_subjects', []))
+      setNotes(getVaultItem('notes', []))
+    }
+    window.addEventListener('studymedia:user_changed', handleUserChanged)
+    return () => window.removeEventListener('studymedia:user_changed', handleUserChanged)
+  }, [getVaultItem])
 
   const [loading, setLoading] = useState(true)
 
@@ -202,7 +198,7 @@ export default function Dashboard({ setCurrentTab }) {
 
   useEffect(() => {
     fetchDashboardData()
-  }, [])
+  }, [activeUserId])
 
   // 30-Second Timer with smooth progress indicator
   useEffect(() => {

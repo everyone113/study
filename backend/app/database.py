@@ -90,4 +90,31 @@ async def init_db():
         );
         """)
 
+        await db.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            email TEXT UNIQUE NOT NULL,
+            name TEXT NOT NULL,
+            avatar TEXT DEFAULT '',
+            password_hash TEXT DEFAULT '',
+            provider TEXT DEFAULT 'email',
+            google_id TEXT DEFAULT '',
+            student_id TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        await db.execute("""
+        CREATE TABLE IF NOT EXISTS user_sync (
+            user_id TEXT PRIMARY KEY,
+            academic_subjects TEXT DEFAULT '[]',
+            gpa_summary TEXT DEFAULT '{}',
+            notes TEXT DEFAULT '[]',
+            documents TEXT DEFAULT '[]',
+            flashcards TEXT DEFAULT '[]',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        """)
+
         await db.commit()

@@ -10,6 +10,7 @@ import {
   QrCode,
   Layers
 } from 'lucide-react'
+import UserMenu from './UserMenu'
 
 export default function Header({ currentTab, setCurrentTab, showDock, setShowDock, onOpenMobileDrawer }) {
   const [timeStr, setTimeStr] = useState('')
@@ -107,10 +108,16 @@ export default function Header({ currentTab, setCurrentTab, showDock, setShowDoc
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
           <span>FastAPI Online</span>
         </div>
+
+        {/* User Account & Cloud Sync Pill */}
+        <UserMenu />
       </div>
 
       {/* Mobile Top Actions */}
       <div className="flex md:hidden items-center gap-2">
+        {/* User Account / Login Button */}
+        <UserMenu isMobile />
+
         {/* Quick WiFi Drop Button */}
         {currentTab !== 'mobile' && (
           <button

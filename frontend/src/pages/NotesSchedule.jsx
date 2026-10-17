@@ -14,33 +14,30 @@ import {
   Search,
   AlertCircle
 } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 
 const LOCAL_STORAGE_NOTES_KEY = 'studymedia_notes'
-const LOCAL_STORAGE_SUBJECTS_KEY = 'studymedia_academic_subjects'
-
 export default function NotesSchedule() {
-  // Load initially from localStorage so notes appear with 0ms delay
+  const { getVaultItem, setVaultItem, currentUser, activeUserId, syncCloudData } = useAuth()
+
+  // Load initially from active user vault with 0ms delay
   const [notes, setNotes] = useState(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_NOTES_KEY)
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        if (Array.isArray(parsed)) return parsed
-      }
-    } catch (e) {}
-    return []
+    return getVaultItem('notes', [])
   })
 
   const [subjects, setSubjects] = useState(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_SUBJECTS_KEY)
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        if (Array.isArray(parsed)) return parsed
-      }
-    } catch (e) {}
-    return []
+    return getVaultItem('academic_subjects', [])
   })
+
+  // Reload state automatically when switching user accounts
+  useEffect(() => {
+    const handleUserChanged = () => {
+      setNotes(getVaultItem('notes', []))
+      setSubjects(getVaultItem('academic_subjects', []))
+    }
+    window.addEventListener('studymedia:user_changed', handleUserChanged)
+    return () => window.removeEventListener('studymedia:user_changed', handleUserChanged)
+  }, [getVaultItem])
 
   const [filterSubject, setFilterSubject] = useState('')
   const [filterCompleted, setFilterCompleted] = useState('')
@@ -162,13 +159,14 @@ export default function NotesSchedule() {
       console.warn('Note saved locally (server offline or unavailable):', err)
     }
 
-    // Always update local storage cache immediately
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_NOTES_KEY)
-      const currentAll = saved ? JSON.parse(saved) : []
-      const updatedAll = [noteItem, ...currentAll.filter(n => n.id !== noteItem.id)]
-      localStorage.setItem(LOCAL_STORAGE_NOTES_KEY, JSON.stringify(updatedAll))
-    } catch (e) {}
+    // Always update isolated user vault immediately & trigger cloud sync
+    const currentAll = getVaultItem('notes', [])
+    const updatedAll = [noteItem, ...currentAll.filter(n => n.id !== noteItem.id)]
+    setNotes(updatedAll)
+    setVaultItem('notes', updatedAll)
+    if (currentUser) {
+      setTimeout(() => syncCloudData(), 1200)
+    }
 
     setShowAddModal(false)
     setNewNote({
@@ -190,14 +188,15 @@ export default function NotesSchedule() {
       console.warn('Toggled note locally:', err)
     }
 
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_NOTES_KEY)
-      const currentAll = saved ? JSON.parse(saved) : notes
-      const updatedAll = currentAll.map(n =>
-        n.id === id ? { ...n, is_completed: n.is_completed === 1 ? 0 : 1 } : n
-      )
-      localStorage.setItem(LOCAL_STORAGE_NOTES_KEY, JSON.stringify(updatedAll))
-    } catch (e) {}
+    const currentAll = getVaultItem('notes', notes)
+    const updatedAll = currentAll.map(n =>
+      n.id === id ? { ...n, is_completed: n.is_completed === 1 ? 0 : 1 } : n
+    )
+    setNotes(updatedAll)
+    setVaultItem('notes', updatedAll)
+    if (currentUser) {
+      setTimeout(() => syncCloudData(), 1200)
+    }
 
     fetchNotes()
   }
@@ -211,12 +210,13 @@ export default function NotesSchedule() {
       console.warn('Deleted note locally:', err)
     }
 
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_NOTES_KEY)
-      const currentAll = saved ? JSON.parse(saved) : notes
-      const updatedAll = currentAll.filter(n => n.id !== deleteTargetNote.id)
-      localStorage.setItem(LOCAL_STORAGE_NOTES_KEY, JSON.stringify(updatedAll))
-    } catch (e) {}
+    const currentAll = getVaultItem('notes', notes)
+    const updatedAll = currentAll.filter(n => n.id !== deleteTargetNote.id)
+    setNotes(updatedAll)
+    setVaultItem('notes', updatedAll)
+    if (currentUser) {
+      setTimeout(() => syncCloudData(), 1200)
+    }
 
     setDeleteTargetNote(null)
     setDeleting(false)
@@ -231,12 +231,13 @@ export default function NotesSchedule() {
       console.warn('Cleaned completed notes locally:', err)
     }
 
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_NOTES_KEY)
-      const currentAll = saved ? JSON.parse(saved) : notes
-      const updatedAll = currentAll.filter(n => n.is_completed !== 1)
-      localStorage.setItem(LOCAL_STORAGE_NOTES_KEY, JSON.stringify(updatedAll))
-    } catch (e) {}
+    const currentAll = getVaultItem('notes', notes)
+    const updatedAll = currentAll.filter(n => n.is_completed !== 1)
+    setNotes(updatedAll)
+    setVaultItem('notes', updatedAll)
+    if (currentUser) {
+      setTimeout(() => syncCloudData(), 1200)
+    }
 
     setShowCleanCompletedModal(false)
     setDeleting(false)

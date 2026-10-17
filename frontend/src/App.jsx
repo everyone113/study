@@ -4,6 +4,8 @@ import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 import MobileNav from './components/MobileNav'
 import FloatingDock from './components/FloatingDock'
+import { AuthProvider } from './context/AuthContext'
+import AuthModal from './components/AuthModal'
 
 // Pages
 import Dashboard from './pages/Dashboard'
@@ -70,7 +72,7 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-export default function App() {
+function AppContent() {
   const [currentTab, setCurrentTab] = useState(() => {
     try {
       const params = new URLSearchParams(window.location.search)
@@ -167,5 +169,14 @@ export default function App() {
         </div>
       </div>
     </ErrorBoundary>
+  )
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+      <AuthModal />
+    </AuthProvider>
   )
 }
