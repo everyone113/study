@@ -13,24 +13,23 @@ import {
   Sparkles,
   QrCode,
   ChevronDown,
-  ChevronUp,
-  Move
+  ChevronUp
 } from 'lucide-react'
 
-// All dock items with categories and color accents
+// All dock items with categories, clear feature names and vibrant color accents
 export const DOCK_ITEMS = [
-  { id: 'dashboard', label: 'Tổng Quan', icon: Layers, color: 'text-blue-400', group: 'study' },
-  { id: 'academic', label: 'Môn & GPA', icon: GraduationCap, color: 'text-emerald-400', group: 'study' },
-  { id: 'notes', label: 'Lịch & Deadline', icon: CalendarCheck, color: 'text-indigo-400', group: 'study' },
-  { id: 'anatomy', label: 'Giải Phẫu 3D', icon: HeartPulse, color: 'text-rose-400', group: 'study' },
-  { id: 'documents', label: 'Kho Tài Liệu', icon: FileDown, color: 'text-cyan-400', group: 'study' },
-  { id: 'code', label: 'Phòng Code', icon: Terminal, color: 'text-amber-400', group: 'study' },
+  { id: 'dashboard', label: 'Bảng Điều Khiển', shortLabel: 'Tổng quan', icon: Layers, color: 'text-sky-400', group: 'study' },
+  { id: 'academic', label: 'Môn Học & Điểm GPA', shortLabel: 'Điểm GPA', icon: GraduationCap, color: 'text-emerald-400', group: 'study' },
+  { id: 'notes', label: 'Ghi Chú & Lịch Trình', shortLabel: 'Lịch thi', icon: CalendarCheck, color: 'text-indigo-400', group: 'study' },
+  { id: 'anatomy', label: 'Giải Phẫu Học 3D', shortLabel: 'Giải phẫu', icon: HeartPulse, color: 'text-rose-400', group: 'study' },
+  { id: 'documents', label: 'Kho & Tải Tài Liệu', shortLabel: 'Tài liệu', icon: FileDown, color: 'text-cyan-400', group: 'study' },
+  { id: 'code', label: 'Phòng Code Java/C++', shortLabel: 'Code', icon: Terminal, color: 'text-amber-400', group: 'study' },
   { id: 'divider', isDivider: true },
-  { id: 'uikit', label: 'Kho Giao Diện', icon: Layout, color: 'text-fuchsia-400', group: 'tools' },
-  { id: 'animation', label: 'Animation Studio', icon: Flame, color: 'text-orange-400', group: 'tools' },
-  { id: 'media', label: 'Xưởng Media', icon: Video, color: 'text-purple-400', group: 'tools' },
-  { id: 'smart', label: 'Tiện Ích AI', icon: Sparkles, color: 'text-yellow-400', group: 'tools' },
-  { id: 'mobile', label: 'WiFi Drop', icon: QrCode, color: 'text-sky-400', group: 'tools' },
+  { id: 'uikit', label: 'Kho Giao Diện Web', shortLabel: 'UI Kit', icon: Layout, color: 'text-fuchsia-400', group: 'tools' },
+  { id: 'animation', label: 'Animation & Motion FX', shortLabel: 'FX Studio', icon: Flame, color: 'text-orange-400', group: 'tools' },
+  { id: 'media', label: 'Xưởng Sáng Tạo Media', shortLabel: 'Media', icon: Video, color: 'text-purple-400', group: 'tools' },
+  { id: 'smart', label: 'Tiện Ích AI Thông Minh', shortLabel: 'AI Tool', icon: Sparkles, color: 'text-yellow-400', group: 'tools' },
+  { id: 'mobile', label: 'WiFi Drop Bắn File', shortLabel: 'WiFi Drop', icon: QrCode, color: 'text-teal-400', group: 'tools' },
 ]
 
 function DockIcon({ item, currentTab, setCurrentTab, mouseX }) {
@@ -44,11 +43,15 @@ function DockIcon({ item, currentTab, setCurrentTab, mouseX }) {
     return val - bounds.x - bounds.width / 2
   })
 
-  // 1. Spring Magnification physics (smooth scaling from 44px to 68px)
-  const widthSync = useTransform(distance, [-140, 0, 140], [44, 68, 44])
+  // 1. Spring Magnification physics: expands width from 56px to 74px on hover
+  const widthSync = useTransform(distance, [-140, 0, 140], [56, 74, 56])
   const width = useSpring(widthSync, { mass: 0.1, stiffness: 280, damping: 18 })
 
-  // 2. Spring Vertical Lift physics (icon lifts upward by up to 12px on hover)
+  // 2. Spring Height physics: expands height from 56px to 68px on hover
+  const heightSync = useTransform(distance, [-140, 0, 140], [56, 68, 56])
+  const height = useSpring(heightSync, { mass: 0.1, stiffness: 280, damping: 18 })
+
+  // 3. Spring Vertical Lift physics: lifts the hovered icon up by up to 12px
   const ySync = useTransform(distance, [-140, 0, 140], [0, -12, 0])
   const y = useSpring(ySync, { mass: 0.1, stiffness: 280, damping: 18 })
 
@@ -64,14 +67,14 @@ function DockIcon({ item, currentTab, setCurrentTab, mouseX }) {
   return (
     <motion.button
       ref={ref}
-      style={{ width, height: width, y }}
+      style={{ width, height, y }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={handleClick}
-      whileHover={{ scale: 1.06 }}
+      whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.88, y: 2 }}
       transition={{ type: 'spring', stiffness: 450, damping: 16 }}
-      className={`relative flex items-center justify-center rounded-2xl cursor-pointer select-none group transition-colors duration-200 ${
+      className={`relative flex flex-col items-center justify-center px-1 py-1 rounded-2xl cursor-pointer select-none group transition-colors duration-200 ${
         isActive
           ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/40 ring-2 ring-blue-400/60'
           : 'bg-slate-800/80 hover:bg-slate-700/90 text-slate-300 hover:text-white'
@@ -81,25 +84,35 @@ function DockIcon({ item, currentTab, setCurrentTab, mouseX }) {
       <motion.div
         animate={justClicked ? { scale: [1, 1.35, 0.9, 1], rotate: [0, -8, 8, 0] } : { scale: 1, rotate: 0 }}
         transition={{ type: 'spring', stiffness: 500, damping: 12 }}
+        className="shrink-0 flex items-center justify-center"
       >
-        <Icon className={`w-5 h-5 transition-transform duration-200 group-hover:scale-110 ${isActive ? 'text-white' : item.color}`} />
+        <Icon className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-200 group-hover:scale-110 ${isActive ? 'text-white' : item.color}`} />
       </motion.div>
+
+      {/* CLEAR VISIBLE FEATURE NAME LABEL */}
+      <span
+        className={`text-[9px] font-bold tracking-tight text-center leading-none mt-1 truncate max-w-[54px] transition-colors ${
+          isActive ? 'text-white font-extrabold' : 'text-slate-400 group-hover:text-white'
+        }`}
+      >
+        {item.shortLabel || item.label}
+      </span>
 
       {/* Active Indicator Dot under icon with glowing spring */}
       {isActive && (
         <motion.span
           layoutId="activeDockDot"
-          className="absolute -bottom-2 w-2 h-2 rounded-full bg-gradient-to-r from-blue-400 to-cyan-300 shadow-[0_0_12px_#38bdf8]"
+          className="absolute -bottom-1.5 w-1.5 h-1.5 rounded-full bg-gradient-to-r from-blue-300 to-cyan-300 shadow-[0_0_8px_#38bdf8]"
           transition={{ type: 'spring', stiffness: 500, damping: 26 }}
         />
       )}
 
-      {/* Apple-style floating tooltip with Spring physics */}
+      {/* Apple-style floating tooltip with Spring physics (showing full label) */}
       <AnimatePresence>
         {hovered && (
           <motion.div
             initial={{ opacity: 0, y: 15, scale: 0.8 }}
-            animate={{ opacity: 1, y: -52, scale: 1 }}
+            animate={{ opacity: 1, y: -54, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.85 }}
             transition={{ type: 'spring', stiffness: 450, damping: 20 }}
             className="absolute left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-xl bg-slate-900/95 border border-slate-700/90 backdrop-blur-2xl text-white text-[11px] font-bold whitespace-nowrap shadow-2xl pointer-events-none z-50 flex items-center gap-1.5"
@@ -136,7 +149,7 @@ export default function FloatingDock({ currentTab, setCurrentTab }) {
             transition={{ type: 'spring', stiffness: 350, damping: 24, mass: 0.8 }}
             onMouseMove={(e) => mouseX.set(e.pageX)}
             onMouseLeave={() => mouseX.set(Infinity)}
-            className="flex items-center gap-2 px-3.5 py-3 rounded-3xl bg-slate-950/85 border border-slate-700/80 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.7)] ring-1 ring-white/10 select-none cursor-grab active:cursor-grabbing"
+            className="flex items-center gap-2 px-3.5 py-2.5 rounded-3xl bg-slate-950/85 border border-slate-700/80 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.7)] ring-1 ring-white/10 select-none cursor-grab active:cursor-grabbing"
           >
             {/* Collapse Pill Button */}
             <motion.button
@@ -150,14 +163,14 @@ export default function FloatingDock({ currentTab, setCurrentTab }) {
               <ChevronDown className="w-4 h-4" />
             </motion.button>
 
-            {/* Dock Icons with macOS Spring Magnification physics */}
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 px-1">
+            {/* Dock Icons with Visible Feature Labels & macOS Spring Magnification physics */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 px-1">
               {DOCK_ITEMS.map((item, idx) => {
                 if (item.isDivider) {
                   return (
                     <div
                       key={`div-${idx}`}
-                      className="w-px h-7 bg-slate-800/80 shrink-0 mx-1"
+                      className="w-px h-9 bg-slate-800/80 shrink-0 mx-1 self-center"
                     />
                   )
                 }
@@ -196,7 +209,7 @@ export default function FloatingDock({ currentTab, setCurrentTab }) {
             >
               <ActiveIcon className="w-3.5 h-3.5" />
             </motion.div>
-            <span>{activeItem.label}</span>
+            <span>{activeItem.shortLabel || activeItem.label}</span>
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
             <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
           </motion.button>
