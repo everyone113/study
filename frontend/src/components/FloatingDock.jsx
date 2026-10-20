@@ -88,7 +88,7 @@ function DockIcon({ item, currentTab, setCurrentTab, mouseX }) {
         transition={{ type: 'spring', stiffness: 500, damping: 12 }}
         className="shrink-0 flex items-center justify-center pointer-events-none"
       >
-        <Icon className={`w-5 h-5 transition-transform duration-200 ${isActive ? 'text-white' : item.color}`} />
+        <Icon className={`w-5 h-5 transition-transform duration-200 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`} />
       </motion.div>
 
       {/* Active Indicator reflection glow under icon */}

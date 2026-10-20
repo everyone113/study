@@ -57,11 +57,11 @@ export const NAV_ITEMS = [
     shortLabel: 'Giải Phẫu',
     description: 'Mô hình 3D tim, não, nội tạng & cơ xương Svitylo',
     icon: HeartPulse,
-    badge: 'Y Khoa',
+    badge: 'YKhoa',
     category: 'study',
     color: 'text-rose-400',
     iconBg: 'bg-rose-500/10 group-hover:bg-rose-500/20 text-rose-400',
-    badgeStyle: 'bg-rose-500/20 text-rose-300 border border-rose-500/30',
+    badgeStyle: 'bg-rose-950/80 text-rose-300 border border-rose-800/60',
     activeBg: 'bg-gradient-to-r from-rose-600 to-pink-600 text-white shadow-lg shadow-rose-600/30'
   },
   {
@@ -86,7 +86,7 @@ export const NAV_ITEMS = [
     category: 'study',
     color: 'text-amber-400',
     iconBg: 'bg-amber-500/10 group-hover:bg-amber-500/20 text-amber-400',
-    badgeStyle: 'bg-amber-500/20 text-amber-300 border border-amber-500/30',
+    badgeStyle: 'bg-amber-950/80 text-amber-300 border border-amber-800/60',
     activeBg: 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-lg shadow-amber-600/30'
   },
   {
@@ -99,7 +99,7 @@ export const NAV_ITEMS = [
     category: 'media',
     color: 'text-fuchsia-400',
     iconBg: 'bg-fuchsia-500/10 group-hover:bg-fuchsia-500/20 text-fuchsia-400',
-    badgeStyle: 'bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/30',
+    badgeStyle: 'bg-purple-950/80 text-purple-300 border border-purple-800/60',
     activeBg: 'bg-gradient-to-r from-fuchsia-600 to-purple-600 text-white shadow-lg shadow-fuchsia-600/30'
   },
   {
@@ -112,7 +112,7 @@ export const NAV_ITEMS = [
     category: 'media',
     color: 'text-orange-400',
     iconBg: 'bg-orange-500/10 group-hover:bg-orange-500/20 text-orange-400',
-    badgeStyle: 'bg-orange-500/20 text-orange-300 border border-orange-500/30',
+    badgeStyle: 'bg-orange-950/80 text-orange-300 border border-orange-800/60',
     activeBg: 'bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-lg shadow-orange-600/30'
   },
   {
@@ -125,7 +125,7 @@ export const NAV_ITEMS = [
     category: 'media',
     color: 'text-purple-400',
     iconBg: 'bg-purple-500/10 group-hover:bg-purple-500/20 text-purple-400',
-    badgeStyle: 'bg-purple-500/20 text-purple-300 border border-purple-500/30',
+    badgeStyle: 'bg-indigo-950/80 text-indigo-300 border border-indigo-800/60',
     activeBg: 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-600/30'
   },
   {
@@ -138,7 +138,7 @@ export const NAV_ITEMS = [
     category: 'media',
     color: 'text-yellow-400',
     iconBg: 'bg-yellow-500/10 group-hover:bg-yellow-500/20 text-yellow-400',
-    badgeStyle: 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30',
+    badgeStyle: 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/60',
     activeBg: 'bg-gradient-to-r from-yellow-600 to-amber-600 text-white shadow-lg shadow-yellow-600/30'
   },
   {
@@ -151,7 +151,7 @@ export const NAV_ITEMS = [
     category: 'media',
     color: 'text-teal-400',
     iconBg: 'bg-teal-500/10 group-hover:bg-teal-500/20 text-teal-400',
-    badgeStyle: 'bg-teal-500/20 text-teal-300 border border-teal-500/30',
+    badgeStyle: 'bg-teal-950/80 text-teal-300 border border-teal-800/60',
     activeBg: 'bg-gradient-to-r from-teal-600 to-cyan-600 text-white shadow-lg shadow-teal-600/30'
   },
 ]
@@ -177,9 +177,6 @@ export default function Sidebar({ currentTab, setCurrentTab }) {
 
       {/* Nav items */}
       <nav className="flex-1 space-y-1 overflow-y-auto pr-1">
-        <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider px-3 mb-2">
-          Học tập, Y khoa & Code
-        </div>
         {studyItems.map(item => {
           const Icon = item.icon
           const isActive = currentTab === item.id
@@ -187,27 +184,25 @@ export default function Sidebar({ currentTab, setCurrentTab }) {
             <motion.button
               key={item.id}
               onClick={() => setCurrentTab(item.id)}
-              whileHover={{ x: 4 }}
-              whileTap={{ scale: 0.97 }}
+              whileHover={{ x: 3 }}
+              whileTap={{ scale: 0.98 }}
               transition={{ type: 'spring', stiffness: 450, damping: 20 }}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-sm transition-all cursor-pointer group ${
                 isActive
-                  ? item.activeBg
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                  ? 'bg-gradient-to-r from-blue-600 to-sky-500 text-white font-bold shadow-[0_4px_20px_rgba(37,99,235,0.45)]'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
               }`}
             >
-              <div className="flex items-center gap-2.5">
-                <div
-                  className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
-                    isActive ? 'bg-white/20 text-white shadow-sm' : item.iconBg
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                </div>
-                <span className={isActive ? 'font-bold' : 'group-hover:text-white'}>{item.label}</span>
+              <div className="flex items-center gap-3">
+                <Icon className={`w-5 h-5 shrink-0 transition-colors ${
+                  isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'
+                }`} />
+                <span className={isActive ? 'font-bold text-white' : 'font-medium group-hover:text-white'}>
+                  {item.label}
+                </span>
               </div>
               {item.badge && (
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
                   isActive
                     ? 'bg-white/25 text-white'
                     : item.badgeStyle || 'bg-slate-800 text-slate-300 border border-slate-700'
@@ -219,8 +214,8 @@ export default function Sidebar({ currentTab, setCurrentTab }) {
           )
         })}
 
-        <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider px-3 mt-5 mb-2">
-          Media & Tiện ích
+        <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider px-3 mt-6 mb-2">
+          MEDIA & TIỆN ÍCH
         </div>
         {mediaItems.map(item => {
           const Icon = item.icon
@@ -229,27 +224,25 @@ export default function Sidebar({ currentTab, setCurrentTab }) {
             <motion.button
               key={item.id}
               onClick={() => setCurrentTab(item.id)}
-              whileHover={{ x: 4 }}
-              whileTap={{ scale: 0.97 }}
+              whileHover={{ x: 3 }}
+              whileTap={{ scale: 0.98 }}
               transition={{ type: 'spring', stiffness: 450, damping: 20 }}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer group ${
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-sm transition-all cursor-pointer group ${
                 isActive
-                  ? item.activeBg
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                  ? 'bg-gradient-to-r from-blue-600 to-sky-500 text-white font-bold shadow-[0_4px_20px_rgba(37,99,235,0.45)]'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
               }`}
             >
-              <div className="flex items-center gap-2.5">
-                <div
-                  className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
-                    isActive ? 'bg-white/20 text-white shadow-sm' : item.iconBg
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                </div>
-                <span className={isActive ? 'font-bold' : 'group-hover:text-white'}>{item.label}</span>
+              <div className="flex items-center gap-3">
+                <Icon className={`w-5 h-5 shrink-0 transition-colors ${
+                  isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'
+                }`} />
+                <span className={isActive ? 'font-bold text-white' : 'font-medium group-hover:text-white'}>
+                  {item.label}
+                </span>
               </div>
               {item.badge && (
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
                   isActive
                     ? 'bg-white/25 text-white'
                     : item.badgeStyle || 'bg-slate-800 text-slate-300 border border-slate-700'

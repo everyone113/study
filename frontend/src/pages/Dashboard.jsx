@@ -207,6 +207,7 @@ export default function Dashboard({ setCurrentTab }) {
   }, [getVaultItem])
 
   const [loading, setLoading] = useState(true)
+  const [showDetailedTables, setShowDetailedTables] = useState(false)
 
   // 30-Second Philosophical Quote Rotation
   const [quoteIndex, setQuoteIndex] = useState(() => Math.floor(Math.random() * PHILOSOPHY_QUOTES.length))
@@ -427,55 +428,61 @@ export default function Dashboard({ setCurrentTab }) {
           fill="none"
         >
           <defs>
-            <radialGradient id="moonGlow" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#f472b6" stopOpacity="0.85" />
-              <stop offset="40%" stopColor="#c084fc" stopOpacity="0.55" />
-              <stop offset="70%" stopColor="#818cf8" stopOpacity="0.25" />
-              <stop offset="100%" stopColor="#818cf8" stopOpacity="0" />
+            <radialGradient id="moonHalo" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#f472b6" stopOpacity="0.6" />
+              <stop offset="45%" stopColor="#c084fc" stopOpacity="0.3" />
+              <stop offset="80%" stopColor="#7c3aed" stopOpacity="0.1" />
+              <stop offset="100%" stopColor="#0c1222" stopOpacity="0" />
             </radialGradient>
+            <linearGradient id="moonDisc" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#fbcfe8" />
+              <stop offset="50%" stopColor="#f472b6" />
+              <stop offset="100%" stopColor="#c084fc" />
+            </linearGradient>
             <linearGradient id="fadeMask" x1="0%" y1="0%" x2="100%" y2="0%">
               <stop offset="0%" stopColor="#0d1424" stopOpacity="1" />
-              <stop offset="30%" stopColor="#0d1424" stopOpacity="0.75" />
-              <stop offset="60%" stopColor="#0d1424" stopOpacity="0.2" />
+              <stop offset="25%" stopColor="#0d1424" stopOpacity="0.85" />
+              <stop offset="55%" stopColor="#0d1424" stopOpacity="0.2" />
               <stop offset="100%" stopColor="#0d1424" stopOpacity="0" />
             </linearGradient>
           </defs>
 
           {/* Stars */}
-          <circle cx="120" cy="40" r="1.5" fill="#ffffff" opacity="0.6" />
-          <circle cx="200" cy="25" r="1.2" fill="#ffffff" opacity="0.5" />
-          <circle cx="280" cy="45" r="1" fill="#ffffff" opacity="0.4" />
-          <circle cx="340" cy="30" r="1.5" fill="#ffffff" opacity="0.7" />
-          <circle cx="420" cy="50" r="1.2" fill="#ffffff" opacity="0.5" />
-          <circle cx="160" cy="70" r="1" fill="#ffffff" opacity="0.3" />
+          <circle cx="140" cy="35" r="1.5" fill="#ffffff" opacity="0.6" />
+          <circle cx="210" cy="20" r="1.2" fill="#ffffff" opacity="0.5" />
+          <circle cx="280" cy="40" r="1" fill="#ffffff" opacity="0.4" />
+          <circle cx="340" cy="25" r="1.5" fill="#ffffff" opacity="0.7" />
+          <circle cx="430" cy="45" r="1.2" fill="#ffffff" opacity="0.5" />
+          <circle cx="470" cy="25" r="1" fill="#ffffff" opacity="0.6" />
+          <circle cx="180" cy="65" r="1.2" fill="#ffffff" opacity="0.35" />
 
-          {/* Glowing Moon / Celestial Orb with rings */}
-          <circle cx="340" cy="110" r="54" fill="url(#moonGlow)" />
-          <circle cx="340" cy="110" r="32" fill="#fbcfe8" opacity="0.9" />
-          <ellipse cx="340" cy="110" rx="48" ry="13" stroke="#e879f9" strokeWidth="1.5" opacity="0.5" transform="rotate(-15 340 110)" />
+          {/* Moon Glow Halo */}
+          <circle cx="370" cy="135" r="75" fill="url(#moonHalo)" />
 
-          {/* Background Mountains */}
-          <path d="M100 240 C 180 170, 260 160, 360 180 C 420 190, 480 165, 500 155 L 500 240 Z" fill="#131c38" opacity="0.75" />
+          {/* Moon Celestial Disc (Warm Pink/Peach/Purple) */}
+          <circle cx="370" cy="135" r="48" fill="url(#moonDisc)" opacity="0.88" />
 
-          {/* Midground Hills */}
-          <path d="M60 240 C 140 190, 240 180, 320 195 C 400 210, 460 190, 500 180 L 500 240 Z" fill="#0f172a" />
+          {/* Background Mountain */}
+          <path d="M100 240 C 200 175, 280 165, 380 180 C 440 190, 480 170, 500 160 L 500 240 Z" fill="#151d3b" opacity="0.85" />
 
-          {/* Pine Trees Silhouettes along the ridge */}
-          <polygon points="260,190 263,174 266,190" fill="#090d16" />
-          <polygon points="270,192 274,172 278,192" fill="#090d16" />
-          <polygon points="282,194 285,178 288,194" fill="#090d16" />
-          <polygon points="295,196 299,170 303,196" fill="#090d16" />
-          <polygon points="310,198 314,174 318,198" fill="#090d16" />
-          <polygon points="380,208 384,185 388,208" fill="#090d16" />
-          <polygon points="392,206 396,180 400,206" fill="#090d16" />
-          <polygon points="405,204 410,178 415,204" fill="#090d16" />
-          <polygon points="420,202 424,184 428,202" fill="#090d16" />
-          <polygon points="440,198 445,175 450,198" fill="#090d16" />
-          <polygon points="455,195 460,172 465,195" fill="#090d16" />
-          <polygon points="470,190 475,168 480,190" fill="#090d16" />
+          {/* Midground Mountain Silhouette (in front of moon) */}
+          <path d="M50 240 C 150 195, 260 180, 350 200 C 420 215, 470 190, 500 185 L 500 240 Z" fill="#0f172a" />
 
-          {/* Foreground Ridge */}
-          <path d="M0 240 C 80 215, 200 210, 300 220 C 400 230, 460 220, 500 210 L 500 240 Z" fill="#080c14" />
+          {/* Pine Trees Silhouettes along the right ridge */}
+          <polygon points="340,205 344,185 348,205" fill="#080c14" />
+          <polygon points="352,207 356,182 360,207" fill="#080c14" />
+          <polygon points="365,208 370,178 375,208" fill="#080c14" />
+          <polygon points="380,210 384,186 388,210" fill="#080c14" />
+          <polygon points="395,208 400,180 405,208" fill="#080c14" />
+          <polygon points="410,206 414,184 418,206" fill="#080c14" />
+          <polygon points="425,204 430,176 435,204" fill="#080c14" />
+          <polygon points="440,202 445,182 450,202" fill="#080c14" />
+          <polygon points="455,198 460,172 465,198" fill="#080c14" />
+          <polygon points="470,195 475,170 480,195" fill="#080c14" />
+          <polygon points="485,192 490,165 495,192" fill="#080c14" />
+
+          {/* Foreground Mountain Ridge */}
+          <path d="M0 240 C 90 220, 220 215, 330 225 C 410 232, 470 222, 500 215 L 500 240 Z" fill="#070b12" />
 
           {/* Left Fade Gradient Mask */}
           <rect x="0" y="0" width="220" height="240" fill="url(#fadeMask)" />
@@ -542,7 +549,7 @@ export default function Dashboard({ setCurrentTab }) {
               <GraduationCap className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-3xl font-extrabold text-white tracking-tight my-1 relative z-10">
+          <div className="text-3xl md:text-4xl font-extrabold text-white tracking-tight my-1 relative z-10">
             {gpa4 > 0 ? gpa4.toFixed(2) : '4.00'}
           </div>
           <div className="text-xs font-semibold text-sky-400 relative z-10">
@@ -559,7 +566,7 @@ export default function Dashboard({ setCurrentTab }) {
               <BarChart2 className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-3xl font-extrabold text-white tracking-tight my-1 relative z-10">
+          <div className="text-3xl md:text-4xl font-extrabold text-white tracking-tight my-1 relative z-10">
             {gpa10 > 0 ? gpa10.toFixed(2) : '8.79'}
           </div>
           <div className="text-xs font-semibold text-slate-400 relative z-10">
@@ -576,7 +583,7 @@ export default function Dashboard({ setCurrentTab }) {
               <BookOpen className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-3xl font-extrabold text-white tracking-tight my-1 relative z-10">
+          <div className="text-3xl md:text-4xl font-extrabold text-white tracking-tight my-1 relative z-10">
             {safeSubjects.length > 0 ? safeSubjects.length : 1}
           </div>
           <div className="text-xs font-semibold text-emerald-400 relative z-10">
@@ -593,7 +600,7 @@ export default function Dashboard({ setCurrentTab }) {
               <Clock className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-3xl font-extrabold text-white tracking-tight my-1 relative z-10">
+          <div className="text-3xl md:text-4xl font-extrabold text-white tracking-tight my-1 relative z-10">
             {pendingNotes.length}
           </div>
           <div className="text-xs font-semibold text-amber-400 relative z-10">
@@ -613,10 +620,10 @@ export default function Dashboard({ setCurrentTab }) {
           {/* Card 1: Môn & Bảng Điểm */}
           <button
             onClick={() => setCurrentTab('academic')}
-            className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800/90 hover:border-slate-700 hover:bg-slate-800/60 transition-all text-left flex items-center justify-between group cursor-pointer shadow-sm"
+            className="p-4 rounded-2xl bg-[#0d1424] border border-slate-800 hover:border-slate-700 hover:bg-[#111a30] transition-all text-left flex items-center justify-between group cursor-pointer shadow-md"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-full bg-blue-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform shrink-0 shadow-lg shadow-blue-600/30">
                 <GraduationCap className="w-5 h-5" />
               </div>
               <div className="min-w-0">
@@ -630,32 +637,32 @@ export default function Dashboard({ setCurrentTab }) {
           {/* Card 2: Atlas Giải Phẫu 3D */}
           <button
             onClick={() => setCurrentTab('anatomy')}
-            className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800/90 hover:border-slate-700 hover:bg-slate-800/60 transition-all text-left flex items-center justify-between group cursor-pointer shadow-sm"
+            className="p-4 rounded-2xl bg-[#0d1424] border border-slate-800 hover:border-slate-700 hover:bg-[#111a30] transition-all text-left flex items-center justify-between group cursor-pointer shadow-md"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-full bg-pink-500/15 border border-pink-500/30 text-pink-400 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-full bg-rose-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform shrink-0 shadow-lg shadow-rose-600/30">
                 <Heart className="w-5 h-5" />
               </div>
               <div className="min-w-0">
                 <div className="font-bold text-sm text-white flex items-center gap-1.5 truncate">
                   <span className="truncate">Atlas Giải Phẫu 3D</span>
-                  <span className="text-[10px] bg-pink-500/20 text-pink-300 px-1.5 py-0.5 rounded-full font-bold shrink-0">
+                  <span className="text-[10px] bg-rose-950 text-rose-300 border border-rose-800/80 px-1.5 py-0.5 rounded-full font-bold shrink-0">
                     YKhoa
                   </span>
                 </div>
                 <div className="text-xs text-slate-400 truncate">Mô hình 3D & tra cứu</div>
               </div>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-pink-400 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
+            <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-rose-400 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
           </button>
 
           {/* Card 3: Ôn Code Java/C++ */}
           <button
             onClick={() => setCurrentTab('code')}
-            className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800/90 hover:border-slate-700 hover:bg-slate-800/60 transition-all text-left flex items-center justify-between group cursor-pointer shadow-sm"
+            className="p-4 rounded-2xl bg-[#0d1424] border border-slate-800 hover:border-slate-700 hover:bg-[#111a30] transition-all text-left flex items-center justify-between group cursor-pointer shadow-md"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-full bg-teal-500/15 border border-teal-500/30 text-teal-400 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-full bg-teal-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform shrink-0 shadow-lg shadow-teal-600/30">
                 <Terminal className="w-5 h-5" />
               </div>
               <div className="min-w-0">
@@ -669,10 +676,10 @@ export default function Dashboard({ setCurrentTab }) {
           {/* Card 4: Tải Video & Lách Trùng */}
           <button
             onClick={() => setCurrentTab('media')}
-            className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800/90 hover:border-slate-700 hover:bg-slate-800/60 transition-all text-left flex items-center justify-between group cursor-pointer shadow-sm"
+            className="p-4 rounded-2xl bg-[#0d1424] border border-slate-800 hover:border-slate-700 hover:bg-[#111a30] transition-all text-left flex items-center justify-between group cursor-pointer shadow-md"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-400 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-full bg-indigo-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform shrink-0 shadow-lg shadow-indigo-600/30">
                 <Video className="w-5 h-5" />
               </div>
               <div className="min-w-0">
@@ -680,16 +687,16 @@ export default function Dashboard({ setCurrentTab }) {
                 <div className="text-xs text-slate-400 truncate">TikTok, YouTube, Ext</div>
               </div>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-purple-400 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
+            <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-indigo-400 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
           </button>
 
           {/* Card 5: Dịch Sub */}
           <button
             onClick={() => setCurrentTab('smart')}
-            className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800/90 hover:border-slate-700 hover:bg-slate-800/60 transition-all text-left flex items-center justify-between group cursor-pointer shadow-sm"
+            className="p-4 rounded-2xl bg-[#0d1424] border border-slate-800 hover:border-slate-700 hover:bg-[#111a30] transition-all text-left flex items-center justify-between group cursor-pointer shadow-md"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-full bg-fuchsia-500/15 border border-fuchsia-500/30 text-fuchsia-400 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-full bg-fuchsia-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform shrink-0 shadow-lg shadow-fuchsia-600/30">
                 <Sparkles className="w-5 h-5" />
               </div>
               <div className="min-w-0">
@@ -703,10 +710,10 @@ export default function Dashboard({ setCurrentTab }) {
           {/* Card 6: Kho Tài Liệu */}
           <button
             onClick={() => setCurrentTab('documents')}
-            className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800/90 hover:border-slate-700 hover:bg-slate-800/60 transition-all text-left flex items-center justify-between group cursor-pointer shadow-sm"
+            className="p-4 rounded-2xl bg-[#0d1424] border border-slate-800 hover:border-slate-700 hover:bg-[#111a30] transition-all text-left flex items-center justify-between group cursor-pointer shadow-md"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-full bg-blue-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform shrink-0 shadow-lg shadow-blue-600/30">
                 <FileText className="w-5 h-5" />
               </div>
               <div className="min-w-0">
@@ -720,10 +727,10 @@ export default function Dashboard({ setCurrentTab }) {
           {/* Card 7: Tiện ích AI */}
           <button
             onClick={() => setCurrentTab('smart')}
-            className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800/90 hover:border-slate-700 hover:bg-slate-800/60 transition-all text-left flex items-center justify-between group cursor-pointer shadow-sm"
+            className="p-4 rounded-2xl bg-[#0d1424] border border-slate-800 hover:border-slate-700 hover:bg-[#111a30] transition-all text-left flex items-center justify-between group cursor-pointer shadow-md"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-full bg-emerald-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform shrink-0 shadow-lg shadow-emerald-600/30">
                 <Sparkles className="w-5 h-5" />
               </div>
               <div className="min-w-0">
@@ -737,10 +744,10 @@ export default function Dashboard({ setCurrentTab }) {
           {/* Card 8: Cài đặt & Cá nhân */}
           <button
             onClick={() => openAuthModal('login')}
-            className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800/90 hover:border-slate-700 hover:bg-slate-800/60 transition-all text-left flex items-center justify-between group cursor-pointer shadow-sm"
+            className="p-4 rounded-2xl bg-[#0d1424] border border-slate-800 hover:border-slate-700 hover:bg-[#111a30] transition-all text-left flex items-center justify-between group cursor-pointer shadow-md"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-full bg-slate-800 border border-slate-700 text-slate-300 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-full bg-slate-700 text-white flex items-center justify-center group-hover:scale-105 transition-transform shrink-0 shadow-lg shadow-slate-800/40">
                 <Settings className="w-5 h-5" />
               </div>
               <div className="min-w-0">
@@ -754,8 +761,9 @@ export default function Dashboard({ setCurrentTab }) {
       </div>
 
 
-      {/* Two columns: Upcoming Deadlines & Recent Subjects */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Optional: Collapsible Upcoming Deadlines & Recent Subjects (hidden by default to match clean dashboard screenshot) */}
+      {showDetailedTables && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
         {/* Deadlines list */}
         <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6">
           <div className="flex items-center justify-between mb-4">
@@ -882,6 +890,7 @@ export default function Dashboard({ setCurrentTab }) {
           )}
         </div>
       </div>
-    </div>
-  )
+    )}
+  </div>
+)
 }
