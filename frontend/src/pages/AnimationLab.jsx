@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import gsap from 'gsap'
 import { animate } from 'animejs'
 import confetti from 'canvas-confetti'
+import VaraHandwriting from '../components/VaraHandwriting'
 import {
   Sparkles,
   Play,
@@ -24,6 +25,7 @@ import {
 
 // Tech stack items for Infinite Marquee
 const TECH_MARQUEE = [
+  { name: 'Vara.js', tag: 'Handwriting SVG', color: 'from-cyan-400 to-teal-500' },
   { name: 'Framer Motion', tag: 'Physics & React', color: 'from-pink-500 to-rose-500' },
   { name: 'GSAP 3', tag: 'Cinematic Timelines', color: 'from-emerald-400 to-green-600' },
   { name: 'Anime.js v4', tag: 'SVG & Kinematics', color: 'from-amber-400 to-orange-500' },
@@ -154,7 +156,8 @@ export default function AnimationLab() {
   }
 
   const categories = [
-    { id: 'all', label: 'Tất Cả Hiệu Ứng', count: 12 },
+    { id: 'all', label: 'Tất Cả Hiệu Ứng', count: 13 },
+    { id: 'vara', label: 'Vara.js Chữ Viết Tay', count: 1 },
     { id: 'framer', label: 'Framer Motion', count: 3 },
     { id: 'gsap', label: 'GSAP 3 Motion', count: 3 },
     { id: 'anime', label: 'Anime.js v4', count: 3 },
@@ -250,6 +253,15 @@ export default function AnimationLab() {
           )
         })}
       </div>
+ 
+      {/* ========================================================================= */}
+      {/* 0. VARA.JS HANDWRITING SVG STUDIO                                         */}
+      {/* ========================================================================= */}
+      {(activeCategory === 'all' || activeCategory === 'vara') && (
+        <section className="space-y-4">
+          <VaraHandwriting />
+        </section>
+      )}
 
       {/* ========================================================================= */}
       {/* 1. FRAMER MOTION SHOWCASE                                                 */}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import confetti from 'canvas-confetti'
+import LucideIconExplorer from '../components/LucideIconExplorer'
 import {
   Layout,
   Layers,
@@ -32,7 +33,7 @@ import {
 } from 'lucide-react'
 
 export default function UIKitStudio() {
-  const [activeCategory, setActiveCategory] = useState('all') // 'all' | 'hero' | 'cards' | 'pricing' | 'forms' | 'navigation'
+  const [activeCategory, setActiveCategory] = useState('all') // 'all' | 'lucide' | 'hero' | 'cards' | 'pricing' | 'forms' | 'navigation'
   const [billingCycle, setBillingCycle] = useState('yearly') // 'monthly' | 'yearly'
   const [selectedCode, setSelectedCode] = useState(null)
   const [copied, setCopied] = useState(false)
@@ -62,6 +63,7 @@ export default function UIKitStudio() {
 
   const categories = [
     { id: 'all', label: 'Tất Cả Giao Diện', count: '10+' },
+    { id: 'lucide', label: 'Biểu Tượng Lucide Icons', count: '1000+' },
     { id: 'hero', label: 'Hero & Banner', count: '2' },
     { id: 'cards', label: 'Thẻ & Bento Grid', count: '4' },
     { id: 'pricing', label: 'Bảng Giá & Gói Dịch Vụ', count: '1' },
@@ -150,6 +152,15 @@ export default function UIKitStudio() {
           )
         })}
       </div>
+
+      {/* ========================================================================= */}
+      {/* 0. LUCIDE ICONS STUDIO                                                    */}
+      {/* ========================================================================= */}
+      {(activeCategory === 'all' || activeCategory === 'lucide') && (
+        <section className="space-y-4">
+          <LucideIconExplorer />
+        </section>
+      )}
 
       {/* ========================================================================= */}
       {/* 1. HERO SECTIONS                                                          */}
