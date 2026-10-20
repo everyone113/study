@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
+import Vara from 'vara'
 import {
   GraduationCap,
   CalendarCheck,
@@ -33,7 +34,8 @@ import {
   RotateCcw,
   BarChart2,
   Settings,
-  Calendar
+  Calendar,
+  PenTool
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
@@ -263,6 +265,59 @@ export default function Dashboard({ setCurrentTab }) {
   }
 
   const currentQuote = PHILOSOPHY_QUOTES[quoteIndex] || PHILOSOPHY_QUOTES[0]
+
+  // Vara.js Handwriting Animation for Philosophy Quotes
+  const [useVaraHandwriting, setUseVaraHandwriting] = useState(true)
+  const [isVaraWriting, setIsVaraWriting] = useState(false)
+  const varaQuoteRef = useRef(null)
+  const varaInstanceRef = useRef(null)
+
+  const renderVaraQuote = () => {
+    if (!varaQuoteRef.current) return
+    const el = varaQuoteRef.current
+    el.innerHTML = ''
+    setIsVaraWriting(true)
+
+    try {
+      varaInstanceRef.current = new Vara(
+        '#vara-quote-canvas',
+        '/fonts/vara/SatisfySL.json',
+        [
+          {
+            text: currentQuote.content,
+            fontSize: 18,
+            strokeWidth: 1.4,
+            color: '#f8fafc',
+            duration: 3800,
+            textAlign: 'left'
+          }
+        ],
+        {
+          strokeWidth: 1.4,
+          color: '#f8fafc',
+          textAlign: 'left',
+          autoAnimation: true
+        }
+      )
+
+      varaInstanceRef.current.ready(() => {
+        setIsVaraWriting(false)
+      })
+      varaInstanceRef.current.animationEnd(() => {
+        setIsVaraWriting(false)
+      })
+    } catch (err) {
+      console.warn('Vara quote render error:', err)
+      setIsVaraWriting(false)
+    }
+  }
+
+  useEffect(() => {
+    if (useVaraHandwriting) {
+      const timer = setTimeout(renderVaraQuote, 160)
+      return () => clearTimeout(timer)
+    }
+  }, [quoteIndex, useVaraHandwriting])
 
   const handleSpeakQuote = () => {
     if ('speechSynthesis' in window) {
@@ -500,11 +555,38 @@ export default function Dashboard({ setCurrentTab }) {
             </div>
 
             <div className="flex items-center gap-2 text-xs text-slate-300">
+              {/* Toggle Vara Handwriting Mode */}
+              <button
+                onClick={() => {
+                  setUseVaraHandwriting(!useVaraHandwriting)
+                  if (!useVaraHandwriting) setTimeout(renderVaraQuote, 120)
+                }}
+                title="Bật/Tắt nét chữ viết tay nghệ thuật Vara.js"
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${
+                  useVaraHandwriting
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                    : 'bg-slate-900/70 text-slate-400 border border-slate-700/80 hover:text-white'
+                }`}
+              >
+                <PenTool className="w-3 h-3 text-cyan-400" />
+                <span>{useVaraHandwriting ? 'Viết tay Vara' : 'Bản in'}</span>
+              </button>
+
               <span className="text-[11px] font-mono text-slate-300 flex items-center gap-1">
                 <span>⌛</span>
                 <span>{isPaused ? 'Tạm dừng' : `Đổi sau ${Math.ceil(30 - (progress * 30) / 100)}s`}</span>
               </span>
+
               <div className="flex items-center gap-0.5 bg-slate-900/60 rounded-xl p-0.5 border border-slate-700/80">
+                {useVaraHandwriting && (
+                  <button
+                    onClick={renderVaraQuote}
+                    title="Vẽ lại nét chữ viết tay Vara từ đầu"
+                    className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-cyan-400 transition-colors cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+                )}
                 <button
                   onClick={handlePrevQuote}
                   title="Câu trước"
@@ -523,11 +605,32 @@ export default function Dashboard({ setCurrentTab }) {
             </div>
           </div>
 
-          {/* Quote Body: Elegant italic quote */}
-          <div className={`transition-opacity duration-300 my-2 ${fade ? 'opacity-100' : 'opacity-0'}`}>
-            <p className="text-sm sm:text-base md:text-lg text-slate-100 font-medium leading-relaxed italic max-w-2xl select-text">
-              “{currentQuote.content}”
-            </p>
+          {/* Quote Body: Vara Handwriting SVG Animation or standard typography */}
+          <div className="my-2 min-h-[90px] max-w-2xl">
+            {useVaraHandwriting ? (
+              <div className="relative">
+                {/* Vara Animated SVG Container */}
+                <div
+                  id="vara-quote-canvas"
+                  ref={varaQuoteRef}
+                  className="w-full overflow-hidden select-text text-slate-100"
+                />
+                {isVaraWriting && (
+                  <div className="flex items-center gap-1.5 text-[10px] text-cyan-400 font-mono mt-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+                    <span>Vara.js đang viết chữ nghệ thuật...</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className={`transition-opacity duration-300 ${fade ? 'opacity-100' : 'opacity-0'}`}>
+                <p className="text-sm sm:text-base md:text-lg text-slate-100 font-medium leading-relaxed italic select-text">
+                  “{currentQuote.content}”
+                </p>
+              </div>
+            )}
+
+            {/* Quote Author */}
             <div className="mt-2 text-xs sm:text-sm font-semibold text-sky-400 font-mono italic">
               — {currentQuote.author}
             </div>
