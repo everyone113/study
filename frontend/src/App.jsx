@@ -150,7 +150,7 @@ function AppContent() {
             onOpenMobileDrawer={() => setMobileDrawerOpen(true)}
           />
 
-          <main className="flex-1 p-3.5 sm:p-4 md:p-8 max-w-7xl mx-auto w-full pb-36 md:pb-36">
+          <main className="flex-1 p-3.5 sm:p-4 md:p-8 max-w-[1600px] mx-auto w-full pb-36 md:pb-36">
             {renderContent()}
           </main>
 
