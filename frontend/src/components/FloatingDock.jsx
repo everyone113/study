@@ -24,7 +24,6 @@ export const DOCK_ITEMS = [
   { id: 'anatomy', label: 'Atlas Giải Phẫu 3D', badge: 'Y Khoa', icon: HeartPulse, color: 'text-rose-400', group: 'study' },
   { id: 'documents', label: 'Kho & Tải Tài Liệu', badge: 'Tài liệu', icon: FileDown, color: 'text-cyan-400', group: 'study' },
   { id: 'code', label: 'Phòng Code Java/C++', badge: 'Dev IDE', icon: Terminal, color: 'text-amber-400', group: 'study' },
-  { id: 'divider', isDivider: true },
   { id: 'uikit', label: 'Kho Giao Diện Web', badge: '50+ Mẫu', icon: Layout, color: 'text-fuchsia-400', group: 'tools' },
   { id: 'animation', label: 'Animation & Motion FX', badge: 'FX Studio', icon: Flame, color: 'text-orange-400', group: 'tools' },
   { id: 'media', label: 'Xưởng Sáng Tạo Media', badge: 'Video/Audio', icon: Video, color: 'text-purple-400', group: 'tools' },
@@ -74,12 +73,12 @@ function DockIcon({ item, currentTab, setCurrentTab, mouseX }) {
       whileHover={{ scale: 1.04 }}
       whileTap={{ scale: 0.88, y: 2 }}
       transition={{ type: 'spring', stiffness: 450, damping: 16 }}
-      className={`relative flex items-center justify-center rounded-2xl cursor-pointer select-none group transition-colors duration-200 ${
+      className={`relative flex items-center justify-center rounded-2xl cursor-pointer select-none group transition-all duration-200 ${
         hovered ? 'z-40' : 'z-10'
       } ${
         isActive
-          ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/40 ring-2 ring-blue-400/60'
-          : 'bg-slate-800/80 hover:bg-slate-700/90 text-slate-300 hover:text-white'
+          ? 'bg-blue-600 text-white shadow-[0_0_20px_rgba(37,99,235,0.75)] ring-1 ring-blue-400/50'
+          : 'bg-transparent hover:bg-slate-800/60 text-slate-400 hover:text-white'
       }`}
     >
       {/* Icon with Spring Bounce when selected */}
@@ -92,11 +91,11 @@ function DockIcon({ item, currentTab, setCurrentTab, mouseX }) {
         <Icon className={`w-5 h-5 transition-transform duration-200 ${isActive ? 'text-white' : item.color}`} />
       </motion.div>
 
-      {/* Active Indicator Dot under icon with glowing spring */}
+      {/* Active Indicator reflection glow under icon */}
       {isActive && (
         <motion.span
           layoutId="activeDockDot"
-          className="absolute -bottom-1.5 w-1.5 h-1.5 rounded-full bg-gradient-to-r from-blue-300 to-cyan-300 shadow-[0_0_8px_#38bdf8]"
+          className="absolute -bottom-2 w-8 h-1 rounded-full bg-blue-400/80 blur-[2px] shadow-[0_0_12px_#38bdf8]"
           transition={{ type: 'spring', stiffness: 500, damping: 26 }}
         />
       )}
@@ -155,7 +154,7 @@ export default function FloatingDock({ currentTab, setCurrentTab }) {
             transition={{ type: 'spring', stiffness: 350, damping: 24, mass: 0.8 }}
             onMouseMove={(e) => mouseX.set(e.pageX)}
             onMouseLeave={() => mouseX.set(Infinity)}
-            className="flex items-center gap-2 px-3.5 py-2.5 rounded-3xl bg-slate-950/85 border border-slate-700/80 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.7)] ring-1 ring-white/10 select-none cursor-grab active:cursor-grabbing overflow-visible"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-[#0a101d]/90 border border-slate-700/60 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.85)] ring-1 ring-white/10 select-none cursor-grab active:cursor-grabbing overflow-visible"
           >
             {/* Collapse Pill Button */}
             <motion.button
@@ -164,32 +163,22 @@ export default function FloatingDock({ currentTab, setCurrentTab }) {
               transition={{ type: 'spring', stiffness: 500, damping: 20 }}
               onClick={() => setCollapsed(true)}
               title="Thu nhỏ Đảo Nổi (Spring Collapse)"
-              className="p-2 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer mr-0.5"
+              className="p-1.5 rounded-xl hover:bg-slate-800/80 text-slate-400 hover:text-white transition-colors cursor-pointer mr-0.5"
             >
               <ChevronDown className="w-4 h-4" />
             </motion.button>
 
             {/* Dock Icons with macOS Spring Magnification physics - overflow-visible ensures tooltips are NEVER clipped */}
-            <div className="flex items-center gap-2 overflow-visible py-1 px-1">
-              {DOCK_ITEMS.map((item, idx) => {
-                if (item.isDivider) {
-                  return (
-                    <div
-                      key={`div-${idx}`}
-                      className="w-px h-8 bg-slate-800/80 shrink-0 mx-1 self-center"
-                    />
-                  )
-                }
-                return (
-                  <DockIcon
-                    key={item.id}
-                    item={item}
-                    currentTab={currentTab}
-                    setCurrentTab={setCurrentTab}
-                    mouseX={mouseX}
-                  />
-                )
-              })}
+            <div className="flex items-center gap-1.5 overflow-visible py-0.5 px-0.5">
+              {DOCK_ITEMS.map((item) => (
+                <DockIcon
+                  key={item.id}
+                  item={item}
+                  currentTab={currentTab}
+                  setCurrentTab={setCurrentTab}
+                  mouseX={mouseX}
+                />
+              ))}
             </div>
           </motion.div>
         ) : (

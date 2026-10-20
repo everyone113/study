@@ -1,17 +1,17 @@
 import React from 'react'
 import { motion } from 'framer-motion'
 import {
+  Home,
   GraduationCap,
   CalendarCheck,
+  HeartPulse,
   FileDown,
   Terminal,
+  Layout,
+  Flame,
   Video,
   Sparkles,
-  QrCode,
-  Layers,
-  HeartPulse,
-  Flame,
-  Layout
+  QrCode
 } from 'lucide-react'
 
 export const NAV_ITEMS = [
@@ -20,12 +20,12 @@ export const NAV_ITEMS = [
     label: 'Tổng quan',
     shortLabel: 'Tổng Quan',
     description: 'Bảng theo dõi GPA, tiến độ & câu nói triết học',
-    icon: Layers,
+    icon: Home,
     badge: null,
     category: 'study',
     color: 'text-sky-400',
     iconBg: 'bg-sky-500/10 group-hover:bg-sky-500/20 text-sky-400',
-    activeBg: 'bg-gradient-to-r from-sky-600 to-blue-600 text-white shadow-lg shadow-sky-600/30'
+    activeBg: 'bg-gradient-to-r from-blue-600 to-sky-500 text-white shadow-lg shadow-blue-600/35 rounded-2xl'
   },
   {
     id: 'academic',
@@ -163,13 +163,13 @@ export default function Sidebar({ currentTab, setCurrentTab }) {
   return (
     <aside className="hidden md:flex flex-col w-64 bg-slate-900/80 border-r border-slate-800/80 p-4 h-screen sticky top-0 backdrop-blur-xl">
       {/* Brand logo */}
-      <div className="flex items-center gap-3 px-3 py-3 mb-5 bg-gradient-to-r from-blue-600/20 via-purple-600/20 to-transparent border border-blue-500/20 rounded-2xl">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
+      <div className="flex items-center gap-3 px-2 py-3 mb-5">
+        <div className="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-600/40 shrink-0">
           <GraduationCap className="w-6 h-6" />
         </div>
         <div>
-          <h1 className="font-bold text-base text-white tracking-tight flex items-center gap-1.5">
-            StudyMedia<span className="text-blue-400">Hub</span>
+          <h1 className="font-bold text-base text-white tracking-tight flex items-center gap-1">
+            StudyMedia <span className="text-blue-400 font-semibold">Hub</span>
           </h1>
           <p className="text-[11px] text-slate-400 font-medium">Personal Workstation</p>
         </div>
@@ -264,11 +264,11 @@ export default function Sidebar({ currentTab, setCurrentTab }) {
 
       {/* Footer info */}
       <div className="pt-4 border-t border-slate-800/80 px-2 flex items-center justify-between text-xs text-slate-400">
-        <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          Ổ D: Ready
+        <span className="flex items-center gap-2 text-xs text-slate-300">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+          <span>Đã sẵn sàng</span>
         </span>
-        <span className="text-[10px] font-mono text-slate-500">v1.1.0</span>
+        <span className="text-xs font-mono text-slate-500">v1.1.0</span>
       </div>
     </aside>
   )

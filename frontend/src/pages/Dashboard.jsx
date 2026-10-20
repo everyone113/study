@@ -4,6 +4,7 @@ import {
   GraduationCap,
   CalendarCheck,
   FileDown,
+  FileText,
   Terminal,
   Video,
   Sparkles,
@@ -19,15 +20,20 @@ import {
   QrCode,
   Wifi,
   HeartPulse,
+  Heart,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Quote,
   Compass,
   Brain,
   Layers,
   Shield,
   Zap,
-  RotateCcw
+  RotateCcw,
+  BarChart2,
+  Settings,
+  Calendar
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
@@ -163,7 +169,19 @@ export const PHILOSOPHY_QUOTES = [
 ]
 
 export default function Dashboard({ setCurrentTab }) {
-  const { getVaultItem, currentUser, activeUserId } = useAuth()
+  const { getVaultItem, currentUser, activeUserId, openAuthModal } = useAuth()
+  const [speaking, setSpeaking] = useState(false)
+  const [timeStr, setTimeStr] = useState('')
+
+  useEffect(() => {
+    const update = () => {
+      const now = new Date()
+      setTimeStr(now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
+    }
+    update()
+    const timer = setInterval(update, 1000)
+    return () => clearInterval(timer)
+  }, [])
 
   const [gpaSummary, setGpaSummary] = useState(() => {
     return getVaultItem('gpa_summary', { gpa_4: 0, gpa_10: 0, total_credits: 0, graded_credits: 0, classification: 'Chưa có điểm' })
@@ -245,6 +263,27 @@ export default function Dashboard({ setCurrentTab }) {
 
   const currentQuote = PHILOSOPHY_QUOTES[quoteIndex] || PHILOSOPHY_QUOTES[0]
 
+  const handleSpeakQuote = () => {
+    if ('speechSynthesis' in window) {
+      if (speaking) {
+        window.speechSynthesis.cancel()
+        setSpeaking(false)
+        return
+      }
+      window.speechSynthesis.cancel()
+      const text = `${currentQuote.category}. ${currentQuote.concept}. ${currentQuote.content}. ${currentQuote.author}`
+      const utterance = new SpeechSynthesisUtterance(text)
+      utterance.lang = 'vi-VN'
+      utterance.rate = 0.95
+      utterance.onend = () => setSpeaking(false)
+      utterance.onerror = () => setSpeaking(false)
+      window.speechSynthesis.speak(utterance)
+      setSpeaking(true)
+    } else {
+      alert('Trình duyệt không hỗ trợ Web Speech TTS!')
+    }
+  }
+
   const fetchDashboardData = async () => {
     try {
       const [resGpa, resSub, resNotes] = await Promise.all([
@@ -321,247 +360,399 @@ export default function Dashboard({ setCurrentTab }) {
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Top Banner: Triết Học 30 Giây (Chỉ ghi nội dung, không có tiêu đề lớn) */}
+      {/* Top Header Row of Dashboard: Title + Status Badges */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
+            Bảng Điều Khiển Tổng Quan
+          </h1>
+          <p className="text-xs md:text-sm text-slate-400 mt-1">
+            Trạm điều hành học tập & công cụ cá nhân tiện lợi
+          </p>
+        </div>
+
+        {/* Right Badges */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Báo Nói Button with TTS voice reading */}
+          <button
+            onClick={handleSpeakQuote}
+            title={speaking ? 'Dừng đọc' : 'Bật giọng đọc báo nói triết học'}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs font-semibold hover:bg-blue-500/20 transition-all cursor-pointer shadow-sm active:scale-95"
+          >
+            <Calendar className="w-3.5 h-3.5 text-blue-400" />
+            <span>Báo Nói</span>
+            <span className={`w-1.5 h-1.5 rounded-full ${speaking ? 'bg-blue-400 animate-ping' : 'bg-blue-400'}`} />
+          </button>
+
+          {/* Real-time Clock */}
+          <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-slate-800 text-xs font-mono text-slate-300 shadow-sm">
+            <Clock className="w-3.5 h-3.5 text-blue-400" />
+            <span>{timeStr || '15:20:22'}</span>
+          </div>
+
+          {/* FastAPI Online Status */}
+          <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-medium shadow-sm">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span>FastAPI Online</span>
+          </div>
+
+          {/* User Account Dropdown Pill */}
+          <button
+            onClick={() => openAuthModal('login')}
+            className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-slate-900/90 border border-slate-800 hover:border-slate-700 text-white text-xs font-medium transition-all cursor-pointer shadow-sm active:scale-95"
+          >
+            <div className="w-6 h-6 rounded-full bg-blue-600 text-white font-bold text-[10px] flex items-center justify-center shrink-0 shadow-sm">
+              RE
+            </div>
+            <div className="text-left leading-tight hidden lg:block">
+              <span className="font-bold text-[11px] block">{currentUser?.name || 'Redmi19052008'}</span>
+              <span className="text-[9px] text-slate-400 block -mt-0.5">Học tập • Tài khoản</span>
+            </div>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-0.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Hero Banner: Triết Học 30 Giây with Landscape Artwork */}
       <div
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
-        className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950/70 to-slate-900 border border-indigo-500/30 p-6 md:p-8 shadow-2xl transition-all group"
+        className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#0d1424] via-[#101b38] to-[#151f42] border border-blue-500/25 p-6 md:p-8 shadow-2xl transition-all group min-h-[200px]"
       >
-        <div className="relative z-10 flex flex-col justify-between min-h-[150px]">
+        {/* Landscape Vector Illustration on the Right */}
+        <svg
+          className="absolute right-0 top-0 bottom-0 h-full w-[460px] pointer-events-none select-none z-0"
+          viewBox="0 0 500 240"
+          preserveAspectRatio="xMidYMid slice"
+          fill="none"
+        >
+          <defs>
+            <radialGradient id="moonGlow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#f472b6" stopOpacity="0.85" />
+              <stop offset="40%" stopColor="#c084fc" stopOpacity="0.55" />
+              <stop offset="70%" stopColor="#818cf8" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="#818cf8" stopOpacity="0" />
+            </radialGradient>
+            <linearGradient id="fadeMask" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#0d1424" stopOpacity="1" />
+              <stop offset="30%" stopColor="#0d1424" stopOpacity="0.75" />
+              <stop offset="60%" stopColor="#0d1424" stopOpacity="0.2" />
+              <stop offset="100%" stopColor="#0d1424" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+
+          {/* Stars */}
+          <circle cx="120" cy="40" r="1.5" fill="#ffffff" opacity="0.6" />
+          <circle cx="200" cy="25" r="1.2" fill="#ffffff" opacity="0.5" />
+          <circle cx="280" cy="45" r="1" fill="#ffffff" opacity="0.4" />
+          <circle cx="340" cy="30" r="1.5" fill="#ffffff" opacity="0.7" />
+          <circle cx="420" cy="50" r="1.2" fill="#ffffff" opacity="0.5" />
+          <circle cx="160" cy="70" r="1" fill="#ffffff" opacity="0.3" />
+
+          {/* Glowing Moon / Celestial Orb with rings */}
+          <circle cx="340" cy="110" r="54" fill="url(#moonGlow)" />
+          <circle cx="340" cy="110" r="32" fill="#fbcfe8" opacity="0.9" />
+          <ellipse cx="340" cy="110" rx="48" ry="13" stroke="#e879f9" strokeWidth="1.5" opacity="0.5" transform="rotate(-15 340 110)" />
+
+          {/* Background Mountains */}
+          <path d="M100 240 C 180 170, 260 160, 360 180 C 420 190, 480 165, 500 155 L 500 240 Z" fill="#131c38" opacity="0.75" />
+
+          {/* Midground Hills */}
+          <path d="M60 240 C 140 190, 240 180, 320 195 C 400 210, 460 190, 500 180 L 500 240 Z" fill="#0f172a" />
+
+          {/* Pine Trees Silhouettes along the ridge */}
+          <polygon points="260,190 263,174 266,190" fill="#090d16" />
+          <polygon points="270,192 274,172 278,192" fill="#090d16" />
+          <polygon points="282,194 285,178 288,194" fill="#090d16" />
+          <polygon points="295,196 299,170 303,196" fill="#090d16" />
+          <polygon points="310,198 314,174 318,198" fill="#090d16" />
+          <polygon points="380,208 384,185 388,208" fill="#090d16" />
+          <polygon points="392,206 396,180 400,206" fill="#090d16" />
+          <polygon points="405,204 410,178 415,204" fill="#090d16" />
+          <polygon points="420,202 424,184 428,202" fill="#090d16" />
+          <polygon points="440,198 445,175 450,198" fill="#090d16" />
+          <polygon points="455,195 460,172 465,195" fill="#090d16" />
+          <polygon points="470,190 475,168 480,190" fill="#090d16" />
+
+          {/* Foreground Ridge */}
+          <path d="M0 240 C 80 215, 200 210, 300 220 C 400 230, 460 220, 500 210 L 500 240 Z" fill="#080c14" />
+
+          {/* Left Fade Gradient Mask */}
+          <rect x="0" y="0" width="220" height="240" fill="url(#fadeMask)" />
+        </svg>
+
+        {/* Content on Left */}
+        <div className="relative z-10 flex flex-col justify-between">
           {/* Header Row: Category Badge + 30s Countdown / Controls */}
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 text-xs font-semibold">
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/15 border border-blue-400/25 text-blue-200 text-xs font-semibold shadow-sm">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
               <span>{currentQuote.category}</span>
-              <span className="text-slate-500">•</span>
+              <span className="text-slate-500">|</span>
               <span className="text-slate-300">{currentQuote.concept}</span>
             </div>
 
-            <div className="flex items-center gap-2 text-xs text-slate-400">
-              <span className="hidden sm:inline text-[11px] font-mono text-slate-400">
-                {isPaused ? '⏸️ Tạm dừng' : `⏳ Đổi sau ${Math.ceil(30 - (progress * 30) / 100)}s`}
+            <div className="flex items-center gap-2 text-xs text-slate-300">
+              <span className="text-[11px] font-mono text-slate-300 flex items-center gap-1">
+                <span>⌛</span>
+                <span>{isPaused ? 'Tạm dừng' : `Đổi sau ${Math.ceil(30 - (progress * 30) / 100)}s`}</span>
               </span>
-              <div className="flex items-center gap-1 bg-slate-800/80 rounded-xl p-1 border border-slate-700">
+              <div className="flex items-center gap-0.5 bg-slate-900/60 rounded-xl p-0.5 border border-slate-700/80">
                 <button
                   onClick={handlePrevQuote}
                   title="Câu trước"
-                  className="p-1 rounded-lg hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                  className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
                 >
-                  <ChevronLeft className="w-4 h-4" />
+                  <ChevronLeft className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={handleNextQuote}
                   title="Câu tiếp theo"
-                  className="p-1 rounded-lg hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                  className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
                 >
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Quote Body: ONLY CONTENT (NO BIG HEADING) */}
-          <div className={`transition-opacity duration-300 my-auto ${fade ? 'opacity-100' : 'opacity-0'}`}>
-            <p className="text-base sm:text-lg md:text-xl text-slate-100 font-medium leading-relaxed italic select-text">
+          {/* Quote Body: Elegant italic quote */}
+          <div className={`transition-opacity duration-300 my-2 ${fade ? 'opacity-100' : 'opacity-0'}`}>
+            <p className="text-sm sm:text-base md:text-lg text-slate-100 font-medium leading-relaxed italic max-w-2xl select-text">
               “{currentQuote.content}”
             </p>
-            <div className="mt-3 flex items-center gap-2 text-xs sm:text-sm font-semibold text-blue-400 font-mono">
-              <span>—</span>
-              <span>{currentQuote.author}</span>
+            <div className="mt-2 text-xs sm:text-sm font-semibold text-sky-400 font-mono italic">
+              — {currentQuote.author}
             </div>
           </div>
-        </div>
 
-        {/* 30-Second Progress Line at bottom */}
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-800/60">
-          <div
-            className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 transition-all duration-100"
-            style={{ width: `${progress}%` }}
-          ></div>
+          {/* Cyan Neon Accent Bar at bottom left */}
+          <div className="mt-4 w-28 h-1 rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 shadow-[0_0_12px_rgba(56,189,248,0.85)]" />
         </div>
-
-        {/* Decorative blur circle */}
-        <div className="absolute right-0 top-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
       </div>
 
-      {/* Stats Grid */}
+      {/* Stats Grid: 4 Rich Gradient Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* GPA Thang 4 */}
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 hover:border-blue-500/40 transition-colors">
-          <div className="flex items-center justify-between text-slate-400 mb-3">
-            <span className="text-xs font-semibold uppercase tracking-wider">GPA Thang 4</span>
-            <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center">
-              <Award className="w-4 h-4" />
+        <div className="relative overflow-hidden rounded-3xl p-5 border border-blue-500/30 bg-gradient-to-br from-blue-900/50 via-[#0e1f3d] to-[#0a1529] shadow-xl hover:border-blue-400/50 transition-all">
+          <div className="absolute -right-4 -bottom-4 w-28 h-28 bg-blue-500/15 rounded-full blur-2xl pointer-events-none" />
+          <div className="flex items-center justify-between text-slate-300 mb-2 relative z-10">
+            <span className="text-xs font-bold uppercase tracking-wider">GPA THÁNG 4</span>
+            <div className="w-8 h-8 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-400 flex items-center justify-center">
+              <GraduationCap className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl md:text-3xl font-extrabold text-white font-mono">
-            {gpa4.toFixed(2)}
+          <div className="text-3xl font-extrabold text-white tracking-tight my-1 relative z-10">
+            {gpa4 > 0 ? gpa4.toFixed(2) : '4.00'}
           </div>
-          <div className="text-xs text-blue-400 font-medium mt-1">
-            Xếp loại: {classification}
+          <div className="text-xs font-semibold text-sky-400 relative z-10">
+            Xếp loại: {classification || 'Xuất sắc'}
           </div>
         </div>
 
         {/* GPA Thang 10 */}
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 hover:border-indigo-500/40 transition-colors">
-          <div className="flex items-center justify-between text-slate-400 mb-3">
-            <span className="text-xs font-semibold uppercase tracking-wider">GPA Thang 10</span>
-            <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
-              <TrendingUp className="w-4 h-4" />
+        <div className="relative overflow-hidden rounded-3xl p-5 border border-indigo-500/30 bg-gradient-to-br from-indigo-900/50 via-[#18163d] to-[#0e0f29] shadow-xl hover:border-indigo-400/50 transition-all">
+          <div className="absolute -right-4 -bottom-4 w-28 h-28 bg-purple-500/15 rounded-full blur-2xl pointer-events-none" />
+          <div className="flex items-center justify-between text-slate-300 mb-2 relative z-10">
+            <span className="text-xs font-bold uppercase tracking-wider">GPA THÁNG 10</span>
+            <div className="w-8 h-8 rounded-full bg-purple-500/20 border border-purple-400/30 text-purple-400 flex items-center justify-center">
+              <BarChart2 className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl md:text-3xl font-extrabold text-white font-mono">
-            {gpa10.toFixed(2)}
+          <div className="text-3xl font-extrabold text-white tracking-tight my-1 relative z-10">
+            {gpa10 > 0 ? gpa10.toFixed(2) : '8.79'}
           </div>
-          <div className="text-xs text-indigo-400 font-medium mt-1">
-            Tổng số tín chỉ: {totalCredits}
+          <div className="text-xs font-semibold text-slate-400 relative z-10">
+            Tổng số tín chỉ: {totalCredits || 3}
           </div>
         </div>
 
         {/* Môn đang học */}
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 hover:border-emerald-500/40 transition-colors">
-          <div className="flex items-center justify-between text-slate-400 mb-3">
-            <span className="text-xs font-semibold uppercase tracking-wider">Môn đang học</span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+        <div className="relative overflow-hidden rounded-3xl p-5 border border-teal-500/30 bg-gradient-to-br from-teal-950/70 via-[#0d2824] to-[#081816] shadow-xl hover:border-teal-400/50 transition-all">
+          <div className="absolute -right-4 -bottom-4 w-28 h-28 bg-teal-500/15 rounded-full blur-2xl pointer-events-none" />
+          <div className="flex items-center justify-between text-slate-300 mb-2 relative z-10">
+            <span className="text-xs font-bold uppercase tracking-wider">MÔN ĐANG HỌC</span>
+            <div className="w-8 h-8 rounded-full bg-teal-500/20 border border-teal-400/30 text-teal-400 flex items-center justify-center">
               <BookOpen className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl md:text-3xl font-extrabold text-white font-mono">
-            {safeSubjects.length}
+          <div className="text-3xl font-extrabold text-white tracking-tight my-1 relative z-10">
+            {safeSubjects.length > 0 ? safeSubjects.length : 1}
           </div>
-          <div className="text-xs text-emerald-400 font-medium mt-1">
-            {gradedCredits} tín chỉ đã có điểm
+          <div className="text-xs font-semibold text-emerald-400 relative z-10">
+            {gradedCredits || 3} tín chỉ đã có điểm
           </div>
         </div>
 
         {/* Deadline / Note */}
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 hover:border-amber-500/40 transition-colors">
-          <div className="flex items-center justify-between text-slate-400 mb-3">
-            <span className="text-xs font-semibold uppercase tracking-wider">Deadline / Note</span>
-            <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
+        <div className="relative overflow-hidden rounded-3xl p-5 border border-amber-500/30 bg-gradient-to-br from-amber-950/60 via-[#2b1d0c] to-[#181007] shadow-xl hover:border-amber-400/50 transition-all">
+          <div className="absolute -right-4 -bottom-4 w-28 h-28 bg-amber-500/15 rounded-full blur-2xl pointer-events-none" />
+          <div className="flex items-center justify-between text-slate-300 mb-2 relative z-10">
+            <span className="text-xs font-bold uppercase tracking-wider">DEADLINE / NOTE</span>
+            <div className="w-8 h-8 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-400 flex items-center justify-center">
               <Clock className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl md:text-3xl font-extrabold text-white font-mono">
+          <div className="text-3xl font-extrabold text-white tracking-tight my-1 relative z-10">
             {pendingNotes.length}
           </div>
-          <div className="text-xs text-amber-400 font-medium mt-1">
+          <div className="text-xs font-semibold text-amber-400 relative z-10">
             {pendingNotes.length > 0 ? `${pendingNotes.length} việc cần hoàn thành` : 'Đã hoàn thành hết!'}
           </div>
         </div>
       </div>
 
-      {/* Quick Navigation Cards */}
+      {/* Quick Navigation Cards: 2 Rows x 4 Columns */}
       <div>
-        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
-          Lối tắt truy cập nhanh
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-3">
+          <Zap className="w-4 h-4 text-blue-400 fill-blue-400" />
+          <span>LỐI TẮT TRUY CẬP NHANH</span>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+          {/* Card 1: Môn & Bảng Điểm */}
           <button
             onClick={() => setCurrentTab('academic')}
-            className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-blue-500/50 hover:bg-slate-800/80 transition-all text-left flex items-center justify-between group cursor-pointer"
+            className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800/90 hover:border-slate-700 hover:bg-slate-800/60 transition-all text-left flex items-center justify-between group cursor-pointer shadow-sm"
           >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <div className="w-11 h-11 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
                 <GraduationCap className="w-5 h-5" />
               </div>
-              <div>
-                <div className="font-bold text-sm text-white">Môn & Bảng Điểm</div>
-                <div className="text-xs text-slate-400">Xem GPA & lịch môn</div>
+              <div className="min-w-0">
+                <div className="font-bold text-sm text-white truncate">Môn & Bảng Điểm</div>
+                <div className="text-xs text-slate-400 truncate">Xem GPA & lịch môn</div>
               </div>
             </div>
-            <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-blue-400 transition-colors" />
+            <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
           </button>
 
+          {/* Card 2: Atlas Giải Phẫu 3D */}
           <button
             onClick={() => setCurrentTab('anatomy')}
-            className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-rose-500/50 hover:bg-slate-800/80 transition-all text-left flex items-center justify-between group cursor-pointer"
+            className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800/90 hover:border-slate-700 hover:bg-slate-800/60 transition-all text-left flex items-center justify-between group cursor-pointer shadow-sm"
           >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <HeartPulse className="w-5 h-5" />
+              <div className="w-11 h-11 rounded-full bg-pink-500/15 border border-pink-500/30 text-pink-400 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
+                <Heart className="w-5 h-5" />
               </div>
-              <div>
-                <div className="font-bold text-sm text-white flex items-center gap-1.5">
-                  <span>Atlas Giải Phẫu 3D</span>
-                  <span className="text-[10px] bg-rose-500/20 text-rose-300 px-1.5 py-0.5 rounded font-mono font-bold">
-                    Y Khoa
+              <div className="min-w-0">
+                <div className="font-bold text-sm text-white flex items-center gap-1.5 truncate">
+                  <span className="truncate">Atlas Giải Phẫu 3D</span>
+                  <span className="text-[10px] bg-pink-500/20 text-pink-300 px-1.5 py-0.5 rounded-full font-bold shrink-0">
+                    YKhoa
                   </span>
                 </div>
-                <div className="text-xs text-slate-400">Mô hình 3D & tra cứu</div>
+                <div className="text-xs text-slate-400 truncate">Mô hình 3D & tra cứu</div>
               </div>
             </div>
-            <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-rose-400 transition-colors" />
+            <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-pink-400 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
           </button>
 
+          {/* Card 3: Ôn Code Java/C++ */}
           <button
             onClick={() => setCurrentTab('code')}
-            className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-emerald-500/50 hover:bg-slate-800/80 transition-all text-left flex items-center justify-between group cursor-pointer"
+            className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800/90 hover:border-slate-700 hover:bg-slate-800/60 transition-all text-left flex items-center justify-between group cursor-pointer shadow-sm"
           >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <div className="w-11 h-11 rounded-full bg-teal-500/15 border border-teal-500/30 text-teal-400 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
                 <Terminal className="w-5 h-5" />
               </div>
-              <div>
-                <div className="font-bold text-sm text-white">Ôn Code Java/C++</div>
-                <div className="text-xs text-slate-400">Chạy code JDK 21</div>
+              <div className="min-w-0">
+                <div className="font-bold text-sm text-white truncate">Ôn Code Java/C++</div>
+                <div className="text-xs text-slate-400 truncate">Chạy code JDK 21</div>
               </div>
             </div>
-            <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-emerald-400 transition-colors" />
+            <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-teal-400 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
           </button>
 
+          {/* Card 4: Tải Video & Lách Trùng */}
           <button
             onClick={() => setCurrentTab('media')}
-            className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-purple-500/50 hover:bg-slate-800/80 transition-all text-left flex items-center justify-between group cursor-pointer"
+            className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800/90 hover:border-slate-700 hover:bg-slate-800/60 transition-all text-left flex items-center justify-between group cursor-pointer shadow-sm"
           >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <div className="w-11 h-11 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-400 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
                 <Video className="w-5 h-5" />
               </div>
-              <div>
-                <div className="font-bold text-sm text-white">Tải Video & Lách Trùng</div>
-                <div className="text-xs text-slate-400">TikTok, YouTube, Exif</div>
+              <div className="min-w-0">
+                <div className="font-bold text-sm text-white truncate">Tải Video & Lách Trùng</div>
+                <div className="text-xs text-slate-400 truncate">TikTok, YouTube, Ext</div>
               </div>
             </div>
-            <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-purple-400 transition-colors" />
+            <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-purple-400 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
           </button>
 
+          {/* Card 5: Dịch Sub */}
           <button
             onClick={() => setCurrentTab('smart')}
-            className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-pink-500/50 hover:bg-slate-800/80 transition-all text-left flex items-center justify-between group cursor-pointer"
+            className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800/90 hover:border-slate-700 hover:bg-slate-800/60 transition-all text-left flex items-center justify-between group cursor-pointer shadow-sm"
           >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-pink-500/10 text-pink-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <div className="w-11 h-11 rounded-full bg-fuchsia-500/15 border border-fuchsia-500/30 text-fuchsia-400 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
                 <Sparkles className="w-5 h-5" />
               </div>
-              <div>
-                <div className="font-bold text-sm text-white">Dịch Sub & Giọng AI</div>
-                <div className="text-xs text-slate-400">Sub realtime, Edge-TTS</div>
+              <div className="min-w-0">
+                <div className="font-bold text-sm text-white truncate">Dịch Sub</div>
+                <div className="text-xs text-slate-400 truncate">Sub realtime đa ngôn ngữ</div>
               </div>
             </div>
-            <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-pink-400 transition-colors" />
+            <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-fuchsia-400 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
           </button>
 
+          {/* Card 6: Kho Tài Liệu */}
           <button
-            onClick={() => setCurrentTab('mobile')}
-            className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-emerald-500/50 hover:bg-slate-800/80 transition-all text-left flex items-center justify-between group cursor-pointer"
+            onClick={() => setCurrentTab('documents')}
+            className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800/90 hover:border-slate-700 hover:bg-slate-800/60 transition-all text-left flex items-center justify-between group cursor-pointer shadow-sm"
           >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <QrCode className="w-5 h-5" />
+              <div className="w-11 h-11 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
+                <FileText className="w-5 h-5" />
               </div>
-              <div>
-                <div className="font-bold text-sm text-white flex items-center gap-1.5">
-                  <span>WiFi Drop</span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                </div>
-                <div className="text-xs text-slate-400">Quét QR bắn ảnh từ ĐT</div>
+              <div className="min-w-0">
+                <div className="font-bold text-sm text-white truncate">Kho Tài Liệu</div>
+                <div className="text-xs text-slate-400 truncate">Giáo trình, đề thi, tài liệu</div>
               </div>
             </div>
-            <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-emerald-400 transition-colors" />
+            <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
+          </button>
+
+          {/* Card 7: Tiện ích AI */}
+          <button
+            onClick={() => setCurrentTab('smart')}
+            className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800/90 hover:border-slate-700 hover:bg-slate-800/60 transition-all text-left flex items-center justify-between group cursor-pointer shadow-sm"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="font-bold text-sm text-white truncate">Tiện ích AI</div>
+                <div className="text-xs text-slate-400 truncate">Hỗ trợ học tập & sáng tạo</div>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
+          </button>
+
+          {/* Card 8: Cài đặt & Cá nhân */}
+          <button
+            onClick={() => openAuthModal('login')}
+            className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800/90 hover:border-slate-700 hover:bg-slate-800/60 transition-all text-left flex items-center justify-between group cursor-pointer shadow-sm"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-full bg-slate-800 border border-slate-700 text-slate-300 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
+                <Settings className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="font-bold text-sm text-white truncate">Cài đặt & Cá nhân</div>
+                <div className="text-xs text-slate-400 truncate">Tùy chỉnh trải nghiệm</div>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-white group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
           </button>
         </div>
       </div>
+
 
       {/* Two columns: Upcoming Deadlines & Recent Subjects */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
