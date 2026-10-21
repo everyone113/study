@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 
 import { removeBackgroundClient, compressImageForUpload } from '../utils/bgRemoverClient'
+import { processImageAntiDuplicateClient, processVideoAntiDuplicateClient } from '../utils/antiDuplicateClient'
 
 export default function MediaStudio() {
   const [activeTab, setActiveTab] = useState('downloader') // 'downloader' | 'antidup' | 'nobg'
@@ -28,10 +29,20 @@ export default function MediaStudio() {
   // Anti Duplicate states
   const [antiDupType, setAntiDupType] = useState('video') // 'video' | 'image'
   const [antiFile, setAntiFile] = useState(null)
+  const [antiPreview, setAntiPreview] = useState(null)
   const [antiSpeed, setAntiSpeed] = useState(1.008)
   const [antiMicroZoom, setAntiMicroZoom] = useState(true)
   const [antiLoading, setAntiLoading] = useState(false)
   const [antiResult, setAntiResult] = useState(null)
+
+  const handleAntiFileSelect = (e) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setAntiFile(file)
+      setAntiPreview(URL.createObjectURL(file))
+      setAntiResult(null)
+    }
+  }
 
   // Background Remover states
   const [bgFile, setBgFile] = useState(null)
@@ -189,32 +200,62 @@ export default function MediaStudio() {
     }
   }
 
-  // 2. Anti-Duplicate Process
+  // 2. Anti-Duplicate Process (Dual Engine: Local Desktop AI/FFmpeg + Client-Side High-Speed Engine)
   const handleAntiDupSubmit = async (e) => {
     e.preventDefault()
     if (!antiFile) return
     setAntiLoading(true)
     setAntiResult(null)
 
-    try {
-      const formData = new FormData()
-      formData.append('file', antiFile)
+    const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    let backendSuccess = false
 
-      let res
-      if (antiDupType === 'video') {
-        formData.append('speed_factor', antiSpeed)
-        formData.append('micro_zoom', antiMicroZoom)
-        res = await axios.post('/api/media/anti-duplicate/video', formData)
-      } else {
-        formData.append('mode', 'smart')
-        res = await axios.post('/api/media/anti-duplicate/image', formData)
+    // Try desktop backend if running on localhost / desktop workstation
+    if (isLocalHost) {
+      try {
+        const formData = new FormData()
+        formData.append('file', antiFile)
+
+        let res
+        if (antiDupType === 'video') {
+          formData.append('speed_factor', antiSpeed)
+          formData.append('micro_zoom', antiMicroZoom)
+          res = await axios.post('/api/media/anti-duplicate/video', formData, { timeout: 60000 })
+        } else {
+          formData.append('mode', 'smart')
+          res = await axios.post('/api/media/anti-duplicate/image', formData, { timeout: 15000 })
+        }
+
+        if (res.data && res.data.status === 'success') {
+          setAntiResult({
+            ...res.data,
+            engine: antiDupType === 'video' ? 'backend_ffmpeg' : 'backend_pillow',
+            processed_url: res.data.data_url || res.data.processed_url
+          })
+          backendSuccess = true
+        }
+      } catch (backendErr) {
+        console.warn('[AntiDup Backend] Local backend not responding or error, falling back to client engine:', backendErr)
       }
-      setAntiResult(res.data)
-    } catch (err) {
-      alert(err.response?.data?.detail || 'Lỗi khi xử lý lách trùng lặp')
-    } finally {
-      setAntiLoading(false)
     }
+
+    // Client-side engine (Runs 100% on Vercel, offline, or when backend is unavailable)
+    if (!backendSuccess) {
+      try {
+        let clientRes
+        if (antiDupType === 'video') {
+          clientRes = await processVideoAntiDuplicateClient(antiFile)
+        } else {
+          clientRes = await processImageAntiDuplicateClient(antiFile)
+        }
+        setAntiResult(clientRes)
+      } catch (clientErr) {
+        console.error('[AntiDup Client Error]:', clientErr)
+        alert('Lỗi khi xử lý lách trùng lặp: ' + (clientErr.message || 'Không thể can thiệp dữ liệu'))
+      }
+    }
+
+    setAntiLoading(false)
   }
 
   // 3. Background Removal (Dual Engine: Local U2-Net AI + Client-Side High-Speed Canvas)
@@ -431,14 +472,14 @@ export default function MediaStudio() {
               <div className="flex bg-slate-800 p-1 rounded-xl text-xs">
                 <button
                   type="button"
-                  onClick={() => { setAntiDupType('video'); setAntiFile(null); setAntiResult(null); }}
+                  onClick={() => { setAntiDupType('video'); setAntiFile(null); setAntiPreview(null); setAntiResult(null); }}
                   className={`px-3 py-1 rounded-lg ${antiDupType === 'video' ? 'bg-purple-600 text-white' : 'text-slate-400'}`}
                 >
                   Xử lý Video
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setAntiDupType('image'); setAntiFile(null); setAntiResult(null); }}
+                  onClick={() => { setAntiDupType('image'); setAntiFile(null); setAntiPreview(null); setAntiResult(null); }}
                   className={`px-3 py-1 rounded-lg ${antiDupType === 'image' ? 'bg-purple-600 text-white' : 'text-slate-400'}`}
                 >
                   Xử lý Ảnh
@@ -455,10 +496,28 @@ export default function MediaStudio() {
                   type="file"
                   required
                   accept={antiDupType === 'video' ? 'video/*' : 'image/*'}
-                  onChange={e => setAntiFile(e.target.files[0])}
-                  className="w-full text-xs text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-500"
+                  onChange={handleAntiFileSelect}
+                  className="w-full text-xs text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-500 cursor-pointer"
                 />
               </div>
+
+              {antiPreview && !antiResult && (
+                <div className="flex items-center gap-3 p-3 bg-slate-800/40 rounded-2xl border border-slate-800 animate-in fade-in">
+                  {antiDupType === 'image' ? (
+                    <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-950 flex-shrink-0 border border-slate-700">
+                      <img src={antiPreview} alt="Gốc" className="w-full h-full object-cover" />
+                    </div>
+                  ) : (
+                    <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-950 flex-shrink-0 border border-slate-700 flex items-center justify-center text-purple-400">
+                      <Video className="w-8 h-8" />
+                    </div>
+                  )}
+                  <div className="text-xs text-slate-300 space-y-0.5 truncate">
+                    <p className="font-medium truncate">{antiFile?.name}</p>
+                    <p className="text-[10px] text-slate-500">{(antiFile?.size / 1024 / 1024).toFixed(2)} MB • Sẵn sàng xử lý</p>
+                  </div>
+                </div>
+              )}
 
               {antiDupType === 'video' && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-800/40 p-4 rounded-2xl border border-slate-800">
@@ -473,7 +532,7 @@ export default function MediaStudio() {
                       step="0.002"
                       value={antiSpeed}
                       onChange={e => setAntiSpeed(parseFloat(e.target.value))}
-                      className="w-full accent-purple-500"
+                      className="w-full accent-purple-500 cursor-pointer"
                     />
                     <span className="text-[11px] text-slate-400">
                       Thay đổi thời lượng và âm phổ mili-giây không làm méo tiếng
@@ -486,7 +545,7 @@ export default function MediaStudio() {
                       id="microzoom"
                       checked={antiMicroZoom}
                       onChange={e => setAntiMicroZoom(e.target.checked)}
-                      className="w-4 h-4 accent-purple-500 rounded"
+                      className="w-4 h-4 accent-purple-500 rounded cursor-pointer"
                     />
                     <label htmlFor="microzoom" className="text-xs text-slate-300 cursor-pointer">
                       Micro-zoom (Cắt viền 2px chống thuật toán quét khung hình đối xứng)
@@ -498,61 +557,118 @@ export default function MediaStudio() {
               <button
                 type="submit"
                 disabled={antiLoading || !antiFile}
-                className="w-full py-3 rounded-2xl bg-purple-600 hover:bg-purple-500 disabled:bg-slate-800 text-white font-bold text-sm shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2"
+                className="w-full py-3 rounded-2xl bg-purple-600 hover:bg-purple-500 disabled:bg-slate-800 disabled:cursor-not-allowed text-white font-bold text-sm shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
               >
                 <Sliders className="w-4 h-4" />
-                <span>{antiLoading ? 'Đang can thiệp dữ liệu & re-encode...' : 'Tiến Hành Lách Thuật Toán'}</span>
+                <span>{antiLoading ? 'Đang can thiệp dữ liệu & tái tạo chữ ký số...' : 'Tiến Hành Lách Thuật Toán'}</span>
               </button>
             </form>
           </div>
 
           {antiResult && (
-            <div className="bg-slate-900 border border-purple-500/30 rounded-3xl p-6 shadow-2xl space-y-4 animate-in fade-in">
-              <div className="flex items-center justify-between">
-                <h4 className="font-bold text-base text-white flex items-center gap-2">
+            <div className="bg-slate-900 border border-purple-500/30 rounded-3xl p-6 shadow-2xl space-y-6 animate-in fade-in">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
+                <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                  Xử lý hoàn tất! File đã có chữ ký số mới tinh
-                </h4>
-                <a
-                  href={antiResult.processed_url}
-                  download
-                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-purple-600/30"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Tải File Đã Lách</span>
-                </a>
+                  <h4 className="font-bold text-base text-white">Xử lý hoàn tất! File đã có chữ ký số mới tinh</h4>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs px-2.5 py-1 rounded-full bg-purple-900/40 text-purple-300 border border-purple-700/40 font-medium">
+                    {antiResult.engine?.includes('backend') ? '✨ FFmpeg Deep Engine (Desktop)' : '⚡ Web Client Engine (Vercel Siêu Tốc)'}
+                  </span>
+                  {antiResult.elapsed_seconds && (
+                    <span className="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                      {antiResult.elapsed_seconds}s
+                    </span>
+                  )}
+                </div>
               </div>
 
-              {/* MD5 Comparison */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
-                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-                  <span className="text-slate-500 block mb-1">Mã MD5 Ban Đầu:</span>
-                  <span className="text-red-400 break-all">{antiResult.original_md5}</span>
+              {/* Media Preview Player */}
+              <div className="space-y-2">
+                <span className="text-xs font-semibold text-slate-400">Xem trước tệp đã lách:</span>
+                <div className="w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 p-2 flex items-center justify-center">
+                  {antiDupType === 'video' ? (
+                    <video
+                      src={antiResult.processed_url}
+                      controls
+                      playsInline
+                      className="max-h-72 max-w-full rounded-xl"
+                    />
+                  ) : (
+                    <img
+                      src={antiResult.processed_url}
+                      alt="Kết quả"
+                      className="max-h-72 max-w-full rounded-xl object-contain"
+                    />
+                  )}
                 </div>
-                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-                  <span className="text-slate-500 block mb-1">Mã MD5 Mới (Sau Biến Đổi):</span>
-                  <span className="text-emerald-400 break-all">{antiResult.new_md5}</span>
+              </div>
+
+              {/* Cryptographic Hash Comparison (MD5 + SHA-256) */}
+              <div className="space-y-3">
+                <div className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                  So sánh chữ ký số nhị phân (Bằng chứng vượt bộ lọc trùng lặp):
                 </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
+                  <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1">
+                    <span className="text-slate-500 block text-[11px] font-sans font-medium">Chữ Ký MD5 Gốc:</span>
+                    <span className="text-red-400 break-all text-[11px]">{antiResult.original_md5}</span>
+                  </div>
+                  <div className="bg-slate-950 p-3.5 rounded-xl border border-emerald-500/20 space-y-1">
+                    <span className="text-slate-500 block text-[11px] font-sans font-medium">Chữ Ký MD5 Mới (Sau Biến Đổi):</span>
+                    <span className="text-emerald-400 break-all text-[11px]">{antiResult.new_md5}</span>
+                  </div>
+                </div>
+
+                {antiResult.original_sha256 && antiResult.new_sha256 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
+                    <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1">
+                      <span className="text-slate-500 block text-[11px] font-sans font-medium">Mã SHA-256 Gốc:</span>
+                      <span className="text-red-400/80 break-all text-[10px]">{antiResult.original_sha256}</span>
+                    </div>
+                    <div className="bg-slate-950 p-3.5 rounded-xl border border-emerald-500/20 space-y-1">
+                      <span className="text-slate-500 block text-[11px] font-sans font-medium">Mã SHA-256 Mới (Độc Bản):</span>
+                      <span className="text-emerald-400/90 break-all text-[10px]">{antiResult.new_sha256}</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Applied Tricks List */}
-              <div className="bg-slate-800/30 rounded-2xl p-4">
+              <div className="bg-slate-800/30 rounded-2xl p-4 border border-slate-800/60">
                 <div className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                  Các kỹ thuật đã áp dụng để vượt qua thuật toán:
+                  Các kỹ thuật đã áp dụng để vượt qua thuật toán quét:
                 </div>
                 <ul className="space-y-1.5 text-xs text-slate-400">
                   {antiResult.applied_tricks.map((trick, idx) => (
                     <li key={idx} className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-purple-400 flex-shrink-0"></span>
                       <span>{trick}</span>
                     </li>
                   ))}
                 </ul>
               </div>
+
+              {/* Download Action */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+                <p className="text-xs text-slate-400">
+                  Tệp đã sẵn sàng với mã băm và siêu dữ liệu hoàn toàn mới, bạn có thể đăng tải trực tiếp lên TikTok, Reels hoặc Shorts mà không lo bị hạn chế tương tác.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => triggerDirectDownload(antiResult.processed_url, antiResult.processed_filename)}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 whitespace-nowrap transition-all cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Tải Tệp Đã Lách Về Máy</span>
+                </button>
+              </div>
             </div>
           )}
         </div>
       )}
+
 
       {/* TAB 3: AI BACKGROUND REMOVER */}
       {activeTab === 'nobg' && (
