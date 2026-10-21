@@ -20,8 +20,10 @@ import {
   AlertCircle,
   X
 } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 
 export default function SmartUtilities() {
+  const { getVaultItem, setVaultItem, currentUser } = useAuth()
   const [activeTab, setActiveTab] = useState('subtitles') // 'subtitles' | 'tts' | 'flashcards' | 'pomodoro' | 'summarize'
   const [toast, setToast] = useState(null) // { type: 'success' | 'error' | 'info' | 'pomo', message: '' }
 
@@ -75,10 +77,27 @@ export default function SmartUtilities() {
   const [ttsResult, setTtsResult] = useState(null)
 
   // Flashcards states
-  const [cards, setCards] = useState([])
+  const [cards, setCards] = useState(() => {
+    return getVaultItem('flashcards', [
+      { id: 1, deck_name: 'Lập trình', front: 'Polymorphism (Đa hình) là gì?', back: 'Khả năng cho phép các đối tượng thuộc các lớp khác nhau phản ứng theo các cách khác nhau với cùng một thông điệp/phương thức.' },
+      { id: 2, deck_name: 'Tiếng Anh', front: 'Ephemeral', back: 'Phù du, chóng tàn, tồn tại trong thời gian rất ngắn.' }
+    ])
+  })
   const [cardIndex, setCardIndex] = useState(0)
   const [isFlipped, setIsFlipped] = useState(false)
   const [newCard, setNewCard] = useState({ deck_name: 'Lập trình', front: '', back: '' })
+
+  // Reload flashcards automatically when switching user accounts or remote sync finishes
+  useEffect(() => {
+    const handleUserChanged = () => {
+      const userCards = getVaultItem('flashcards', null)
+      if (Array.isArray(userCards)) {
+        setCards(userCards)
+      }
+    }
+    window.addEventListener('studymedia:user_changed', handleUserChanged)
+    return () => window.removeEventListener('studymedia:user_changed', handleUserChanged)
+  }, [getVaultItem])
 
   // Pomodoro states
   const [pomoTime, setPomoTime] = useState(25 * 60)
@@ -178,31 +197,68 @@ export default function SmartUtilities() {
   }
 
   const fetchCards = async () => {
+    const localCards = getVaultItem('flashcards', null)
+    if (currentUser && Array.isArray(localCards) && localCards.length > 0) {
+      setCards(localCards)
+      return
+    }
+
     try {
-      const res = await axios.get('/api/tools/flashcards')
-      if (Array.isArray(res.data)) {
+      const res = await axios.get('/api/tools/flashcards', { timeout: 3000 })
+      if (Array.isArray(res.data) && res.data.length > 0) {
         setCards(res.data)
+        if (currentUser) {
+          setVaultItem('flashcards', res.data)
+        }
+        return
       }
-    } catch (err) {
-      console.error(err)
+    } catch (err) {}
+
+    if (Array.isArray(localCards)) {
+      setCards(localCards)
     }
   }
 
   const handleAddCard = async (e) => {
     e.preventDefault()
-    if (!newCard.front || !newCard.back) return
-    try {
-      await axios.post('/api/tools/flashcards', newCard)
-      setNewCard({ deck_name: newCard.deck_name, front: '', back: '' })
-      fetchCards()
-    } catch (err) {
-      showToast('Lỗi tạo thẻ', 'error')
+    if (!newCard.front.trim() || !newCard.back.trim()) return
+
+    const cardItem = {
+      id: Date.now(),
+      deck_name: newCard.deck_name || 'Lập trình',
+      front: newCard.front.trim(),
+      back: newCard.back.trim()
     }
+
+    try {
+      const res = await axios.post('/api/tools/flashcards', newCard, { timeout: 3000 })
+      if (res.data?.id) {
+        cardItem.id = res.data.id
+      }
+    } catch (err) {
+      console.warn('Backend flashcards post skipped:', err)
+    }
+
+    const currentAll = getVaultItem('flashcards', cards)
+    const updated = [cardItem, ...currentAll.filter(c => c.id !== cardItem.id)]
+    setCards(updated)
+    setVaultItem('flashcards', updated)
+    setNewCard({ deck_name: newCard.deck_name, front: '', back: '' })
+    showToast('Đã thêm thẻ flashcard mới và tự động đồng bộ!', 'success')
   }
 
   const handleDeleteCard = async (id) => {
-    await axios.delete(`/api/tools/flashcards/${id}`)
-    fetchCards()
+    try {
+      await axios.delete(`/api/tools/flashcards/${id}`, { timeout: 3000 })
+    } catch (err) {
+      console.warn('Backend delete flashcard skipped:', err)
+    }
+
+    const currentAll = getVaultItem('flashcards', cards)
+    const updated = currentAll.filter(c => c.id !== id)
+    setCards(updated)
+    setVaultItem('flashcards', updated)
+    showToast('Đã xóa thẻ flashcard', 'info')
   }
 
   // Summarize
