@@ -55,6 +55,7 @@ export default function UserMenu({ isMobile = false }) {
     syncStatus,
     lastSyncedAt,
     syncCloudData,
+    pullCloudData,
     generateSyncUrl,
     generateSyncToken
   } = useAuth()
@@ -65,6 +66,7 @@ export default function UserMenu({ isMobile = false }) {
   const [copiedLink, setCopiedLink] = useState(false)
   const [syncUrl, setSyncUrl] = useState('')
   const [syncingLocal, setSyncingLocal] = useState(false)
+  const [manualSyncSuccess, setManualSyncSuccess] = useState(false)
   const [showQrModal, setShowQrModal] = useState(false)
   const menuRef = useRef(null)
 
@@ -110,8 +112,20 @@ export default function UserMenu({ isMobile = false }) {
 
   const handleManualSync = async () => {
     setSyncingLocal(true)
-    await syncCloudData()
-    setTimeout(() => setSyncingLocal(false), 800)
+    try {
+      if (pullCloudData) {
+        await pullCloudData()
+      }
+      if (syncCloudData) {
+        await syncCloudData()
+      }
+      setManualSyncSuccess(true)
+      setTimeout(() => setManualSyncSuccess(false), 3000)
+    } catch (e) {
+      console.warn('Manual sync error:', e)
+    } finally {
+      setTimeout(() => setSyncingLocal(false), 600)
+    }
   }
 
   const handleExportBackup = () => {
@@ -182,7 +196,11 @@ export default function UserMenu({ isMobile = false }) {
                 e.target.src = `https://api.dicebear.com/7.x/initials/svg?seed=${currentUser.name}`
               }}
             />
-            <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-slate-900" />
+            <span className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-2 ring-slate-900 ${
+              syncStatus === 'syncing' || syncingLocal
+                ? 'bg-amber-400 animate-pulse'
+                : 'bg-emerald-400'
+            }`} />
           </div>
 
           {/* User Info & Cloud Sync Indicator */}
@@ -193,7 +211,11 @@ export default function UserMenu({ isMobile = false }) {
             <div className="text-[10px] text-slate-400 flex items-center gap-1">
               <span className="font-mono text-cyan-400">#{currentUser.id.replace('usr_', '')}</span>
               <span>•</span>
-              <span className="text-emerald-400 font-medium">Tài khoản</span>
+              {syncStatus === 'syncing' || syncingLocal ? (
+                <span className="text-amber-400 font-medium animate-pulse">Đang lưu...</span>
+              ) : (
+                <span className="text-emerald-400 font-medium">Đã đồng bộ</span>
+              )}
             </div>
           </div>
 
@@ -273,21 +295,37 @@ export default function UserMenu({ isMobile = false }) {
               {/* Cloud Sync Status */}
               <div className="mt-3 p-2.5 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Cloud className="w-4 h-4 text-blue-400" />
+                  <div className="relative">
+                    <Cloud className={`w-4 h-4 ${syncStatus === 'syncing' || syncingLocal ? 'text-amber-400 animate-pulse' : 'text-blue-400'}`} />
+                    {(syncStatus === 'syncing' || syncingLocal) && (
+                      <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                    )}
+                  </div>
                   <div>
-                    <span className="text-[11px] font-bold text-slate-200 block">Đồng bộ đám mây</span>
+                    <span className="text-[11px] font-bold text-slate-200 flex items-center gap-1.5">
+                      <span>Đồng bộ đám mây</span>
+                      {syncStatus === 'syncing' || syncingLocal ? (
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-semibold">Đang lưu</span>
+                      ) : manualSyncSuccess ? (
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-semibold">Đã đồng bộ</span>
+                      ) : null}
+                    </span>
                     <span className="text-[10px] text-slate-400">
-                      {lastSyncedAt ? `Cập nhật ${lastSyncedAt}` : 'Sẵn sàng'}
+                      {syncStatus === 'syncing' || syncingLocal
+                        ? 'Đang gửi & nhận dữ liệu...'
+                        : lastSyncedAt
+                        ? `Cập nhật ${lastSyncedAt}`
+                        : 'Sẵn sàng'}
                     </span>
                   </div>
                 </div>
                 <button
                   onClick={handleManualSync}
                   disabled={syncingLocal || syncStatus === 'syncing'}
-                  title="Đồng bộ ngay"
-                  className="p-1.5 rounded-xl bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 transition-colors"
+                  title="Đồng bộ 2 chiều ngay"
+                  className="p-1.5 rounded-xl bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 transition-colors disabled:opacity-50"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${syncingLocal ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`w-3.5 h-3.5 ${syncingLocal || syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
                 </button>
               </div>
 
