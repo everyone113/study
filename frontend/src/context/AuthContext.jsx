@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import axios from 'axios'
 import Peer from 'peerjs'
 
@@ -22,6 +22,10 @@ export function AuthProvider({ children }) {
   const [lastSyncedAt, setLastSyncedAt] = useState(() => {
     return localStorage.getItem('studymedia_last_synced_at') || null
   })
+
+  const pushDebounceTimerRef = useRef(null)
+  const activeP2pConnRef = useRef(null)
+  const syncCloudDataRef = useRef(null)
 
   const isGuest = !currentUser
   const activeUserId = currentUser ? currentUser.id : 'guest'
@@ -67,7 +71,7 @@ export function AuthProvider({ children }) {
   }, [currentUser, getVaultKey])
 
   /**
-   * Helper to write to current user's vault safely.
+   * Helper to write to current user's vault safely with debounced auto-push & real-time P2P sync.
    */
   const setVaultItem = useCallback((baseKey, value) => {
     try {
@@ -76,6 +80,28 @@ export function AuthProvider({ children }) {
       // Also update legacy key if guest for backward compatibility
       if (!currentUser) {
         localStorage.setItem(`studymedia_${baseKey}`, JSON.stringify(value))
+      } else {
+        // 1. Broadcast immediately to paired device via WebRTC DataChannel if active
+        if (activeP2pConnRef.current && activeP2pConnRef.current.open) {
+          try {
+            activeP2pConnRef.current.send({
+              type: 'VAULT_PARTIAL_UPDATE',
+              key: baseKey,
+              data: value
+            })
+          } catch (e) {}
+        }
+
+        // 2. Debounce cloud sync push (1200ms)
+        if (pushDebounceTimerRef.current) {
+          clearTimeout(pushDebounceTimerRef.current)
+        }
+        setSyncStatus('syncing')
+        pushDebounceTimerRef.current = setTimeout(() => {
+          if (syncCloudDataRef.current) {
+            syncCloudDataRef.current()
+          }
+        }, 1200)
       }
     } catch (e) {}
   }, [currentUser, getVaultKey])
@@ -571,7 +597,7 @@ export function AuthProvider({ children }) {
   /**
    * Push all local user data to cloud.
    */
-  const syncCloudData = async (targetId = null) => {
+  const syncCloudData = useCallback(async (targetId = null) => {
     const uid = targetId || (currentUser ? currentUser.id : null)
     if (!uid) return
 
@@ -583,14 +609,18 @@ export function AuthProvider({ children }) {
       const documents = getVaultItem('documents', [])
       const flashcards = getVaultItem('flashcards', [])
 
-      await axios.post('/api/sync/push', {
+      const res = await axios.post('/api/sync/push', {
         user_id: uid,
         academic_subjects: subjects,
         gpa_summary: gpa,
         notes: notes,
         documents: documents,
         flashcards: flashcards
-      }, { timeout: 5000 })
+      }, { timeout: 6000 })
+
+      if (res.data?.updated_at) {
+        localStorage.setItem(`studymedia_vault_${uid}_cloud_updated_at`, res.data.updated_at)
+      }
 
       const nowTime = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
       setLastSyncedAt(nowTime)
@@ -600,12 +630,17 @@ export function AuthProvider({ children }) {
       console.warn('Cloud sync push warning (offline or server asleep):', err)
       setSyncStatus('synced')
     }
-  }
+  }, [currentUser, getVaultItem])
+
+  // Keep ref up to date for debounced auto-push
+  useEffect(() => {
+    syncCloudDataRef.current = syncCloudData
+  }, [syncCloudData])
 
   /**
    * Pull user data from cloud and update local vault.
    */
-  const pullCloudData = async (targetId = null) => {
+  const pullCloudData = useCallback(async (targetId = null) => {
     const uid = targetId || (currentUser ? currentUser.id : null)
     if (!uid) return
 
@@ -613,25 +648,28 @@ export function AuthProvider({ children }) {
     try {
       const res = await axios.get('/api/sync/pull', {
         params: { user_id: uid },
-        timeout: 5000
+        timeout: 6000
       })
 
       if (res.data?.success && res.data.has_data && res.data.data) {
         const { academic_subjects, gpa_summary, notes, documents, flashcards } = res.data.data
-        if (Array.isArray(academic_subjects) && academic_subjects.length > 0) {
+        if (Array.isArray(academic_subjects)) {
           localStorage.setItem(`studymedia_vault_${uid}_academic_subjects`, JSON.stringify(academic_subjects))
         }
-        if (gpa_summary) {
+        if (gpa_summary !== undefined && gpa_summary !== null) {
           localStorage.setItem(`studymedia_vault_${uid}_gpa_summary`, JSON.stringify(gpa_summary))
         }
-        if (Array.isArray(notes) && notes.length > 0) {
+        if (Array.isArray(notes)) {
           localStorage.setItem(`studymedia_vault_${uid}_notes`, JSON.stringify(notes))
         }
-        if (Array.isArray(documents) && documents.length > 0) {
+        if (Array.isArray(documents)) {
           localStorage.setItem(`studymedia_vault_${uid}_documents`, JSON.stringify(documents))
         }
-        if (Array.isArray(flashcards) && flashcards.length > 0) {
+        if (Array.isArray(flashcards)) {
           localStorage.setItem(`studymedia_vault_${uid}_flashcards`, JSON.stringify(flashcards))
+        }
+        if (res.data.updated_at) {
+          localStorage.setItem(`studymedia_vault_${uid}_cloud_updated_at`, res.data.updated_at)
         }
         window.dispatchEvent(new CustomEvent('studymedia:user_changed', { detail: { user: currentUser } }))
       }
@@ -644,11 +682,73 @@ export function AuthProvider({ children }) {
       console.warn('Cloud pull warning:', err)
       setSyncStatus('synced')
     }
-  }
+  }, [currentUser])
+
+  /**
+   * Lightweight check if remote cloud has newer updates and pull them.
+   */
+  const checkAndPullIfNewer = useCallback(async (targetId = null) => {
+    const uid = targetId || (currentUser ? currentUser.id : null)
+    if (!uid) return
+
+    try {
+      const res = await axios.get('/api/sync/check', {
+        params: { user_id: uid },
+        timeout: 4000
+      })
+
+      if (res.data?.success && res.data.exists && res.data.updated_at) {
+        const localCloudTs = localStorage.getItem(`studymedia_vault_${uid}_cloud_updated_at`)
+        if (res.data.updated_at !== localCloudTs) {
+          await pullCloudData(uid)
+        }
+      }
+    } catch (err) {
+      // Offline or network error -> ignore
+    }
+  }, [currentUser, pullCloudData])
+
+  // Automatic pull on mount and auto-refresh on tab focus / visibilitychange
+  useEffect(() => {
+    if (!currentUser?.id) return
+
+    // Auto-pull cloud data when app starts or recovers session
+    pullCloudData(currentUser.id)
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && currentUser?.id) {
+        checkAndPullIfNewer(currentUser.id)
+      }
+    }
+
+    const handleFocus = () => {
+      if (currentUser?.id) {
+        checkAndPullIfNewer(currentUser.id)
+      }
+    }
+
+    const heartbeatTimer = setInterval(() => {
+      if (document.visibilityState === 'visible' && currentUser?.id) {
+        checkAndPullIfNewer(currentUser.id)
+      }
+    }, 35000)
+
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('focus', handleFocus)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('focus', handleFocus)
+      clearInterval(heartbeatTimer)
+    }
+  }, [currentUser?.id, pullCloudData, checkAndPullIfNewer])
 
   // Automatic Real-time P2P Peer Sync between PC and Phone for the same account
   useEffect(() => {
-    if (!currentUser || !currentUser.email) return
+    if (!currentUser || !currentUser.email) {
+      activeP2pConnRef.current = null
+      return
+    }
 
     let peer = null
     let conn = null
@@ -679,66 +779,82 @@ export function AuthProvider({ children }) {
         }
       })
 
+      const sendFullPayload = (c) => {
+        try {
+          c.send({
+            type: 'SYNC_PAYLOAD',
+            subjects: getVaultItem('academic_subjects', []),
+            gpa: getVaultItem('gpa_summary', null),
+            notes: getVaultItem('notes', []),
+            documents: getVaultItem('documents', []),
+            flashcards: getVaultItem('flashcards', [])
+          })
+        } catch (e) {}
+      }
+
+      const handleP2pData = (data) => {
+        if (data?.type === 'SYNC_REQUEST') {
+          if (conn) sendFullPayload(conn)
+        } else if (data?.type === 'SYNC_PAYLOAD') {
+          if (Array.isArray(data.subjects)) {
+            localStorage.setItem(`studymedia_vault_${currentUser.id}_academic_subjects`, JSON.stringify(data.subjects))
+            localStorage.setItem('studymedia_academic_subjects', JSON.stringify(data.subjects))
+          }
+          if (data.gpa !== undefined && data.gpa !== null) {
+            localStorage.setItem(`studymedia_vault_${currentUser.id}_gpa_summary`, JSON.stringify(data.gpa))
+            localStorage.setItem('studymedia_gpa_summary', JSON.stringify(data.gpa))
+          }
+          if (Array.isArray(data.notes)) {
+            localStorage.setItem(`studymedia_vault_${currentUser.id}_notes`, JSON.stringify(data.notes))
+            localStorage.setItem('studymedia_notes', JSON.stringify(data.notes))
+          }
+          if (Array.isArray(data.documents)) {
+            localStorage.setItem(`studymedia_vault_${currentUser.id}_documents`, JSON.stringify(data.documents))
+            localStorage.setItem('studymedia_documents', JSON.stringify(data.documents))
+          }
+          if (Array.isArray(data.flashcards)) {
+            localStorage.setItem(`studymedia_vault_${currentUser.id}_flashcards`, JSON.stringify(data.flashcards))
+            localStorage.setItem('studymedia_flashcards', JSON.stringify(data.flashcards))
+          }
+          window.dispatchEvent(new CustomEvent('studymedia:user_changed', { detail: { user: currentUser } }))
+        } else if (data?.type === 'VAULT_PARTIAL_UPDATE' && data.key) {
+          localStorage.setItem(`studymedia_vault_${currentUser.id}_${data.key}`, JSON.stringify(data.data))
+          localStorage.setItem(`studymedia_${data.key}`, JSON.stringify(data.data))
+          window.dispatchEvent(new CustomEvent('studymedia:user_changed', { detail: { user: currentUser } }))
+        }
+      }
+
       // On incoming connection (e.g. PC receives connection from Phone)
       peer.on('connection', (incomingConn) => {
-        incomingConn.on('data', (data) => {
-          if (data?.type === 'SYNC_REQUEST') {
-            const currentSubs = getVaultItem('academic_subjects', [])
-            const currentGpa = getVaultItem('gpa_summary', null)
-            incomingConn.send({
-              type: 'SYNC_PAYLOAD',
-              subjects: currentSubs,
-              gpa: currentGpa
-            })
-          } else if (data?.type === 'SYNC_PAYLOAD') {
-            if (data.subjects && Array.isArray(data.subjects) && data.subjects.length > 0) {
-              localStorage.setItem(`studymedia_vault_${currentUser.id}_academic_subjects`, JSON.stringify(data.subjects))
-              localStorage.setItem('studymedia_academic_subjects', JSON.stringify(data.subjects))
-            }
-            if (data.gpa) {
-              localStorage.setItem(`studymedia_vault_${currentUser.id}_gpa_summary`, JSON.stringify(data.gpa))
-              localStorage.setItem('studymedia_gpa_summary', JSON.stringify(data.gpa))
-            }
-            window.dispatchEvent(new CustomEvent('studymedia:user_changed', { detail: { user: currentUser } }))
-          }
-        })
+        conn = incomingConn
+        activeP2pConnRef.current = incomingConn
 
+        incomingConn.on('data', handleP2pData)
         incomingConn.on('open', () => {
-          if (!isMobile) {
-            const currentSubs = getVaultItem('academic_subjects', [])
-            const currentGpa = getVaultItem('gpa_summary', null)
-            if (currentSubs.length > 0) {
-              incomingConn.send({
-                type: 'SYNC_PAYLOAD',
-                subjects: currentSubs,
-                gpa: currentGpa
-              })
-            }
+          sendFullPayload(incomingConn)
+        })
+        incomingConn.on('close', () => {
+          if (activeP2pConnRef.current === incomingConn) {
+            activeP2pConnRef.current = null
           }
         })
       })
 
-      // If on Phone, proactively connect to Computer to pull latest subjects & GPA
+      // If on Phone, proactively connect to Computer to pull latest data
       if (isMobile) {
         peer.on('open', () => {
           setTimeout(() => {
             if (!isSubscribed || peer.destroyed) return
             try {
               conn = peer.connect(remotePeerId, { reliable: true })
+              activeP2pConnRef.current = conn
               conn.on('open', () => {
                 conn.send({ type: 'SYNC_REQUEST' })
               })
-              conn.on('data', (data) => {
-                if (data?.type === 'SYNC_PAYLOAD') {
-                  if (data.subjects && Array.isArray(data.subjects) && data.subjects.length > 0) {
-                    localStorage.setItem(`studymedia_vault_${currentUser.id}_academic_subjects`, JSON.stringify(data.subjects))
-                    localStorage.setItem('studymedia_academic_subjects', JSON.stringify(data.subjects))
-                  }
-                  if (data.gpa) {
-                    localStorage.setItem(`studymedia_vault_${currentUser.id}_gpa_summary`, JSON.stringify(data.gpa))
-                    localStorage.setItem('studymedia_gpa_summary', JSON.stringify(data.gpa))
-                  }
-                  window.dispatchEvent(new CustomEvent('studymedia:user_changed', { detail: { user: currentUser } }))
+              conn.on('data', handleP2pData)
+              conn.on('close', () => {
+                if (activeP2pConnRef.current === conn) {
+                  activeP2pConnRef.current = null
                 }
               })
             } catch (e) {}
@@ -749,6 +865,7 @@ export function AuthProvider({ children }) {
 
     return () => {
       isSubscribed = false
+      activeP2pConnRef.current = null
       try {
         if (conn) conn.close()
         if (peer) peer.destroy()
@@ -783,6 +900,7 @@ export function AuthProvider({ children }) {
         logout,
         syncCloudData,
         pullCloudData,
+        checkAndPullIfNewer,
         generateSyncUrl,
         generateSyncToken,
         importSyncToken,
