@@ -40,10 +40,36 @@ async def push_sync(req: PushSyncRequest, db = Depends(get_db)):
 
     await db.commit()
 
+    cursor = await db.execute("SELECT updated_at FROM user_sync WHERE user_id = ?", (req.user_id,))
+    row = await cursor.fetchone()
+    updated_at = row["updated_at"] if row else None
+
     return {
         "success": True,
         "message": "Đã đồng bộ toàn bộ dữ liệu cá nhân lên đám mây an toàn!",
-        "user_id": req.user_id
+        "user_id": req.user_id,
+        "updated_at": updated_at
+    }
+
+@router.get("/check")
+async def check_sync(user_id: str, db = Depends(get_db)):
+    """Lightweight check to see if cloud data exists and its last updated timestamp."""
+    if not user_id:
+        raise HTTPException(status_code=400, detail="Thiếu mã định danh user_id.")
+
+    cursor = await db.execute("SELECT updated_at FROM user_sync WHERE user_id = ?", (user_id,))
+    row = await cursor.fetchone()
+    if not row or not row["updated_at"]:
+        return {
+            "success": True,
+            "exists": False,
+            "updated_at": None
+        }
+
+    return {
+        "success": True,
+        "exists": True,
+        "updated_at": row["updated_at"]
     }
 
 @router.get("/pull")

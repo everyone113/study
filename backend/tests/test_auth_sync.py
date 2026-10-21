@@ -65,7 +65,9 @@ def test_cloud_sync_push_and_pull():
         "gpa_summary": {"gpa_10": 9.2, "gpa_4": 3.8}
     })
     assert push_res.status_code == 200
-    assert push_res.json()["success"] is True
+    push_data = push_res.json()
+    assert push_data["success"] is True
+    assert "updated_at" in push_data and push_data["updated_at"] is not None
 
     # Pull sync data
     pull_res = client.get(f"/api/sync/pull?user_id={user_id}")
@@ -76,3 +78,25 @@ def test_cloud_sync_push_and_pull():
     assert len(pull_data["data"]["academic_subjects"]) == 1
     assert pull_data["data"]["academic_subjects"][0]["code"] == "CS101"
     assert pull_data["data"]["gpa_summary"]["gpa_10"] == 9.2
+
+def test_cloud_sync_check_endpoint():
+    user_id = "usr_synctest_check_888"
+
+    # Non-existent user check
+    check_none = client.get(f"/api/sync/check?user_id={user_id}")
+    assert check_none.status_code == 200
+    assert check_none.json()["exists"] is False
+    assert check_none.json()["updated_at"] is None
+
+    # Push data
+    client.post("/api/sync/push", json={
+        "user_id": user_id,
+        "notes": [{"id": 1, "title": "Check note"}]
+    })
+
+    # Existing user check
+    check_exists = client.get(f"/api/sync/check?user_id={user_id}")
+    assert check_exists.status_code == 200
+    data = check_exists.json()
+    assert data["exists"] is True
+    assert data["updated_at"] is not None
