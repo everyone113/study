@@ -62,7 +62,26 @@ from app.routes.wifi_drop import get_mobile_drop_html, get_local_ip
 @app.get("/api/anatomy-data/{file_path:path}")
 @app.get("/anatomy-data/{file_path:path}")
 async def proxy_anatomy_data(file_path: str):
-    """High-performance CORS-free proxy for 3D Anatomy Atlas data with automatic decompression."""
+    """High-performance CORS-free proxy for 3D Anatomy Atlas data with local file priority."""
+    local_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "frontend", "public", "anatomy-data", file_path.replace("/", os.sep)
+    )
+    if os.path.exists(local_path) and os.path.isfile(local_path):
+        import mimetypes
+        mime_type, _ = mimetypes.guess_type(local_path)
+        with open(local_path, "rb") as f:
+            content = f.read()
+        return Response(
+            content=content,
+            status_code=200,
+            media_type=mime_type or "application/octet-stream",
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Cache-Control": "public, max-age=86400"
+            }
+        )
+
     target_url = f"https://svitylo.com/anatomy-data/{file_path}"
     try:
         async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
