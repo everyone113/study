@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
 from typing import Optional, List
+import asyncio
 from app.services.translator import translate_text, parse_and_translate_srt
 
 router = APIRouter(prefix="/api", tags=["Subtitles & Translation"])
@@ -27,11 +28,19 @@ async def translate_single_text(req: TranslateRequest):
 
 @router.post("/translate/batch")
 async def translate_batch_texts(req: BatchTranslateRequest):
-    results = []
-    for t in req.texts:
-        res = await translate_text(t, req.source_lang or "auto", req.target_lang or "vi")
-        results.append(res)
-    return {"translations": results}
+    if not req.texts:
+        return {"translations": []}
+
+    sem = asyncio.Semaphore(10)
+    source_lang = req.source_lang or "auto"
+    target_lang = req.target_lang or "vi"
+
+    async def _sem_translate(text: str) -> str:
+        async with sem:
+            return await translate_text(text, source_lang, target_lang)
+
+    results = await asyncio.gather(*[_sem_translate(t) for t in req.texts])
+    return {"translations": list(results)}
 
 @router.post("/subtitles/parse-srt")
 async def parse_srt_file(

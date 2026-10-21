@@ -1,5 +1,6 @@
 import re
 import httpx
+import asyncio
 from typing import List, Dict, Any, Optional
 
 TRANSLATION_CACHE: Dict[str, str] = {}
@@ -105,8 +106,12 @@ async def parse_and_translate_srt(srt_content: str, target_lang: str = "vi") -> 
             "translated": ""
         })
 
-    # Translate first 30 cues or batch
-    for cue in cues:
-        cue["translated"] = await translate_text(cue["text"], "auto", target_lang)
+    # Concurrently translate cues with rate-limiting semaphore
+    sem = asyncio.Semaphore(10)
+    async def _sem_translate_cue(c):
+        async with sem:
+            c["translated"] = await translate_text(c["text"], "auto", target_lang)
+
+    await asyncio.gather(*[_sem_translate_cue(cue) for cue in cues])
 
     return cues

@@ -281,7 +281,7 @@ export default function Dashboard({ setCurrentTab }) {
     try {
       varaInstanceRef.current = new Vara(
         '#vara-quote-canvas',
-        '/fonts/vara/SatisfySL.json',
+        '/fonts/vara/vietnamese-satisfy.json',
         [
           {
             text: currentQuote.content,

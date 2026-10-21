@@ -11,13 +11,51 @@ import {
   CheckCircle2,
   FileCheck,
   Sliders,
-  Scissors
+  Scissors,
+  AlertCircle,
+  X
 } from 'lucide-react'
 
 import { removeBackgroundClient, compressImageForUpload } from '../utils/bgRemoverClient'
 import { processImageAntiDuplicateClient, processVideoAntiDuplicateClient } from '../utils/antiDuplicateClient'
 
 export default function MediaStudio() {
+  const [toast, setToast] = useState(null) // { type: 'success' | 'error' | 'info', message: '' }
+
+  const playChime = (type = 'info') => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext
+      if (!AudioCtx) return
+      const ctx = new AudioCtx()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      if (type === 'error') {
+        osc.frequency.setValueAtTime(220, ctx.currentTime)
+        osc.frequency.exponentialRampToValueAtTime(150, ctx.currentTime + 0.3)
+      } else if (type === 'success') {
+        osc.frequency.setValueAtTime(523.25, ctx.currentTime) // C5
+        osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.12) // E5
+        osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.24) // G5
+        osc.frequency.setValueAtTime(1046.50, ctx.currentTime + 0.36) // C6
+      } else {
+        osc.frequency.setValueAtTime(440, ctx.currentTime)
+        osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.2)
+      }
+      gain.gain.setValueAtTime(0.15, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45)
+      osc.start()
+      osc.stop(ctx.currentTime + 0.45)
+    } catch (e) {}
+  }
+
+  const showToast = (message, type = 'info') => {
+    setToast({ message, type })
+    playChime(type)
+    setTimeout(() => setToast(null), 4000)
+  }
+
   const [activeTab, setActiveTab] = useState(() => {
     try {
       const savedTab = localStorage.getItem('studymedia_media_tab')
@@ -181,7 +219,7 @@ export default function MediaStudio() {
         throw backendErr
       }
     } catch (err) {
-      alert(err.response?.data?.detail || err.message || 'Không thể lấy thông tin video. Vui lòng kiểm tra lại link.')
+      showToast(err.response?.data?.detail || err.message || 'Không thể lấy thông tin video. Vui lòng kiểm tra lại link.', 'error')
     } finally {
       setDlLoading(false)
     }
@@ -232,7 +270,7 @@ export default function MediaStudio() {
         throw new Error('Không tìm thấy link tải trực tiếp cho định dạng này.')
       }
     } catch (err) {
-      alert(err.response?.data?.detail || err.message || 'Lỗi khi tải video')
+      showToast(err.response?.data?.detail || err.message || 'Lỗi khi tải video', 'error')
     } finally {
       setDlLoading(false)
     }
@@ -289,7 +327,7 @@ export default function MediaStudio() {
         setAntiResult(clientRes)
       } catch (clientErr) {
         console.error('[AntiDup Client Error]:', clientErr)
-        alert('Lỗi khi xử lý lách trùng lặp: ' + (clientErr.message || 'Không thể can thiệp dữ liệu'))
+        showToast('Lỗi khi xử lý lách trùng lặp: ' + (clientErr.message || 'Không thể can thiệp dữ liệu'), 'error')
       }
     }
 
@@ -341,7 +379,7 @@ export default function MediaStudio() {
       }
     } catch (err) {
       console.error('[Background Removal Error]:', err)
-      alert('Không thể tách nền: ' + (err.message || 'Lỗi xử lý ảnh'))
+      showToast('Không thể tách nền: ' + (err.message || 'Lỗi xử lý ảnh'), 'error')
     } finally {
       setBgLoading(false)
     }
@@ -891,6 +929,29 @@ export default function MediaStudio() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Floating Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-md animate-in fade-in slide-in-from-bottom-5 duration-200">
+          <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl backdrop-blur-md border text-sm font-medium ${
+            toast.type === 'error'
+              ? 'bg-rose-950/90 border-rose-500/40 text-rose-200 shadow-rose-950/50'
+              : toast.type === 'success'
+              ? 'bg-emerald-950/90 border-emerald-500/40 text-emerald-200 shadow-emerald-950/50'
+              : 'bg-indigo-950/90 border-indigo-500/40 text-indigo-200 shadow-indigo-950/50'
+          }`}>
+            {toast.type === 'error' ? (
+              <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+            ) : (
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            )}
+            <span className="flex-1 leading-snug">{toast.message}</span>
+            <button onClick={() => setToast(null)} className="p-1 hover:opacity-80 rounded-lg shrink-0">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
     </div>

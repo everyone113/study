@@ -16,11 +16,48 @@ import {
   Trash2,
   CheckCircle,
   HelpCircle,
-  Globe
+  Globe,
+  AlertCircle,
+  X
 } from 'lucide-react'
 
 export default function SmartUtilities() {
   const [activeTab, setActiveTab] = useState('subtitles') // 'subtitles' | 'tts' | 'flashcards' | 'pomodoro' | 'summarize'
+  const [toast, setToast] = useState(null) // { type: 'success' | 'error' | 'info' | 'pomo', message: '' }
+
+  const playChime = (type = 'info') => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext
+      if (!AudioCtx) return
+      const ctx = new AudioCtx()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      if (type === 'error') {
+        osc.frequency.setValueAtTime(220, ctx.currentTime)
+        osc.frequency.exponentialRampToValueAtTime(150, ctx.currentTime + 0.3)
+      } else if (type === 'success' || type === 'pomo') {
+        osc.frequency.setValueAtTime(523.25, ctx.currentTime) // C5
+        osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.12) // E5
+        osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.24) // G5
+        osc.frequency.setValueAtTime(1046.50, ctx.currentTime + 0.36) // C6
+      } else {
+        osc.frequency.setValueAtTime(440, ctx.currentTime)
+        osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.2)
+      }
+      gain.gain.setValueAtTime(0.15, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45)
+      osc.start()
+      osc.stop(ctx.currentTime + 0.45)
+    } catch (e) {}
+  }
+
+  const showToast = (message, type = 'info') => {
+    setToast({ message, type })
+    playChime(type)
+    setTimeout(() => setToast(null), 4000)
+  }
 
   // Subtitle Player states
   const [videoSrc, setVideoSrc] = useState('')
@@ -64,7 +101,10 @@ export default function SmartUtilities() {
       interval = setInterval(() => setPomoTime(t => t - 1), 1000)
     } else if (pomoTime === 0) {
       setPomoRunning(false)
-      alert(pomoMode === 'work' ? 'Hết 25 phút tập trung! Hãy nghỉ ngơi 5 phút nhé.' : 'Hết giờ nghỉ! Bắt đầu chặng học mới nào.')
+      showToast(
+        pomoMode === 'work' ? 'Hết 25 phút tập trung! Hãy nghỉ ngơi 5 phút nhé.' : 'Hết giờ nghỉ! Bắt đầu chặng học mới nào.',
+        'pomo'
+      )
     }
     return () => clearInterval(interval)
   }, [pomoRunning, pomoTime, pomoMode])
@@ -97,9 +137,9 @@ export default function SmartUtilities() {
       formData.append('target_lang', 'vi')
       const res = await axios.post('/api/subtitles/parse-srt', formData)
       setCues(res.data)
-      alert(`Đã nạp và dịch thành công ${res.data.length} đoạn phụ đề!`)
+      showToast(`Đã nạp và dịch thành công ${res.data.length} đoạn phụ đề!`, 'success')
     } catch (err) {
-      alert('Lỗi phân tích phụ đề')
+      showToast('Lỗi phân tích phụ đề', 'error')
     } finally {
       setSubLoading(false)
     }
@@ -131,7 +171,7 @@ export default function SmartUtilities() {
       })
       setTtsResult(res.data)
     } catch (err) {
-      alert(err.response?.data?.detail || 'Lỗi tạo giọng đọc')
+      showToast(err.response?.data?.detail || 'Lỗi tạo giọng đọc', 'error')
     } finally {
       setTtsLoading(false)
     }
@@ -156,7 +196,7 @@ export default function SmartUtilities() {
       setNewCard({ deck_name: newCard.deck_name, front: '', back: '' })
       fetchCards()
     } catch (err) {
-      alert('Lỗi tạo thẻ')
+      showToast('Lỗi tạo thẻ', 'error')
     }
   }
 
@@ -177,7 +217,7 @@ export default function SmartUtilities() {
       })
       setSumResult(res.data)
     } catch (err) {
-      alert(err.response?.data?.detail || 'Lỗi tóm tắt văn bản')
+      showToast(err.response?.data?.detail || 'Lỗi tóm tắt văn bản', 'error')
     } finally {
       setSumLoading(false)
     }
@@ -586,6 +626,29 @@ export default function SmartUtilities() {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Floating Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-md animate-in fade-in slide-in-from-bottom-5 duration-200">
+          <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl backdrop-blur-md border text-sm font-medium ${
+            toast.type === 'error'
+              ? 'bg-rose-950/90 border-rose-500/40 text-rose-200 shadow-rose-950/50'
+              : toast.type === 'success' || toast.type === 'pomo'
+              ? 'bg-emerald-950/90 border-emerald-500/40 text-emerald-200 shadow-emerald-950/50'
+              : 'bg-indigo-950/90 border-indigo-500/40 text-indigo-200 shadow-indigo-950/50'
+          }`}>
+            {toast.type === 'error' ? (
+              <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+            ) : (
+              <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />
+            )}
+            <span className="flex-1 leading-snug">{toast.message}</span>
+            <button onClick={() => setToast(null)} className="p-1 hover:opacity-80 rounded-lg shrink-0">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
     </div>

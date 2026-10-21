@@ -60,6 +60,7 @@ from fastapi import HTTPException
 from app.routes.wifi_drop import get_mobile_drop_html, get_local_ip
 
 @app.get("/api/anatomy-data/{file_path:path}")
+@app.get("/anatomy-data/{file_path:path}")
 async def proxy_anatomy_data(file_path: str):
     """High-performance CORS-free proxy for 3D Anatomy Atlas data with automatic decompression."""
     target_url = f"https://svitylo.com/anatomy-data/{file_path}"

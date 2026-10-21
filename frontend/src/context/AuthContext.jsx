@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
+import Peer from 'peerjs'
 
 const AuthContext = createContext(null)
 
@@ -666,86 +667,84 @@ export function AuthProvider({ children }) {
       const myPeerId = isMobile ? `smh_mob_${safeHash}` : `smh_pc_${safeHash}`
       const remotePeerId = isMobile ? `smh_pc_${safeHash}` : `smh_mob_${safeHash}`
 
-      import('peerjs').then(({ default: Peer }) => {
-        if (!isSubscribed) return
+      if (!isSubscribed) return
 
-        peer = new Peer(myPeerId, {
-          debug: 0,
-          config: {
-            iceServers: [
-              { urls: 'stun:stun.l.google.com:19302' },
-              { urls: 'stun:global.stun.twilio.com:3478' }
-            ]
+      peer = new Peer(myPeerId, {
+        debug: 0,
+        config: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:global.stun.twilio.com:3478' }
+          ]
+        }
+      })
+
+      // On incoming connection (e.g. PC receives connection from Phone)
+      peer.on('connection', (incomingConn) => {
+        incomingConn.on('data', (data) => {
+          if (data?.type === 'SYNC_REQUEST') {
+            const currentSubs = getVaultItem('academic_subjects', [])
+            const currentGpa = getVaultItem('gpa_summary', null)
+            incomingConn.send({
+              type: 'SYNC_PAYLOAD',
+              subjects: currentSubs,
+              gpa: currentGpa
+            })
+          } else if (data?.type === 'SYNC_PAYLOAD') {
+            if (data.subjects && Array.isArray(data.subjects) && data.subjects.length > 0) {
+              localStorage.setItem(`studymedia_vault_${currentUser.id}_academic_subjects`, JSON.stringify(data.subjects))
+              localStorage.setItem('studymedia_academic_subjects', JSON.stringify(data.subjects))
+            }
+            if (data.gpa) {
+              localStorage.setItem(`studymedia_vault_${currentUser.id}_gpa_summary`, JSON.stringify(data.gpa))
+              localStorage.setItem('studymedia_gpa_summary', JSON.stringify(data.gpa))
+            }
+            window.dispatchEvent(new CustomEvent('studymedia:user_changed', { detail: { user: currentUser } }))
           }
         })
 
-        // On incoming connection (e.g. PC receives connection from Phone)
-        peer.on('connection', (incomingConn) => {
-          incomingConn.on('data', (data) => {
-            if (data?.type === 'SYNC_REQUEST') {
-              const currentSubs = getVaultItem('academic_subjects', [])
-              const currentGpa = getVaultItem('gpa_summary', null)
+        incomingConn.on('open', () => {
+          if (!isMobile) {
+            const currentSubs = getVaultItem('academic_subjects', [])
+            const currentGpa = getVaultItem('gpa_summary', null)
+            if (currentSubs.length > 0) {
               incomingConn.send({
                 type: 'SYNC_PAYLOAD',
                 subjects: currentSubs,
                 gpa: currentGpa
               })
-            } else if (data?.type === 'SYNC_PAYLOAD') {
-              if (data.subjects && Array.isArray(data.subjects) && data.subjects.length > 0) {
-                localStorage.setItem(`studymedia_vault_${currentUser.id}_academic_subjects`, JSON.stringify(data.subjects))
-                localStorage.setItem('studymedia_academic_subjects', JSON.stringify(data.subjects))
-              }
-              if (data.gpa) {
-                localStorage.setItem(`studymedia_vault_${currentUser.id}_gpa_summary`, JSON.stringify(data.gpa))
-                localStorage.setItem('studymedia_gpa_summary', JSON.stringify(data.gpa))
-              }
-              window.dispatchEvent(new CustomEvent('studymedia:user_changed', { detail: { user: currentUser } }))
             }
-          })
-
-          incomingConn.on('open', () => {
-            if (!isMobile) {
-              const currentSubs = getVaultItem('academic_subjects', [])
-              const currentGpa = getVaultItem('gpa_summary', null)
-              if (currentSubs.length > 0) {
-                incomingConn.send({
-                  type: 'SYNC_PAYLOAD',
-                  subjects: currentSubs,
-                  gpa: currentGpa
-                })
-              }
-            }
-          })
+          }
         })
+      })
 
-        // If on Phone, proactively connect to Computer to pull latest subjects & GPA
-        if (isMobile) {
-          peer.on('open', () => {
-            setTimeout(() => {
-              if (!isSubscribed || peer.destroyed) return
-              try {
-                conn = peer.connect(remotePeerId, { reliable: true })
-                conn.on('open', () => {
-                  conn.send({ type: 'SYNC_REQUEST' })
-                })
-                conn.on('data', (data) => {
-                  if (data?.type === 'SYNC_PAYLOAD') {
-                    if (data.subjects && Array.isArray(data.subjects) && data.subjects.length > 0) {
-                      localStorage.setItem(`studymedia_vault_${currentUser.id}_academic_subjects`, JSON.stringify(data.subjects))
-                      localStorage.setItem('studymedia_academic_subjects', JSON.stringify(data.subjects))
-                    }
-                    if (data.gpa) {
-                      localStorage.setItem(`studymedia_vault_${currentUser.id}_gpa_summary`, JSON.stringify(data.gpa))
-                      localStorage.setItem('studymedia_gpa_summary', JSON.stringify(data.gpa))
-                    }
-                    window.dispatchEvent(new CustomEvent('studymedia:user_changed', { detail: { user: currentUser } }))
+      // If on Phone, proactively connect to Computer to pull latest subjects & GPA
+      if (isMobile) {
+        peer.on('open', () => {
+          setTimeout(() => {
+            if (!isSubscribed || peer.destroyed) return
+            try {
+              conn = peer.connect(remotePeerId, { reliable: true })
+              conn.on('open', () => {
+                conn.send({ type: 'SYNC_REQUEST' })
+              })
+              conn.on('data', (data) => {
+                if (data?.type === 'SYNC_PAYLOAD') {
+                  if (data.subjects && Array.isArray(data.subjects) && data.subjects.length > 0) {
+                    localStorage.setItem(`studymedia_vault_${currentUser.id}_academic_subjects`, JSON.stringify(data.subjects))
+                    localStorage.setItem('studymedia_academic_subjects', JSON.stringify(data.subjects))
                   }
-                })
-              } catch (e) {}
-            }, 1000)
-          })
-        }
-      }).catch(() => {})
+                  if (data.gpa) {
+                    localStorage.setItem(`studymedia_vault_${currentUser.id}_gpa_summary`, JSON.stringify(data.gpa))
+                    localStorage.setItem('studymedia_gpa_summary', JSON.stringify(data.gpa))
+                  }
+                  window.dispatchEvent(new CustomEvent('studymedia:user_changed', { detail: { user: currentUser } }))
+                }
+              })
+            } catch (e) {}
+          }, 1000)
+        })
+      }
     } catch (e) {}
 
     return () => {
