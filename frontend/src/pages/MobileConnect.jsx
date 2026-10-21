@@ -76,6 +76,34 @@ export function formatBytes(bytes) {
   return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB'
 }
 
+// Reliable STUN + Public TURN config for symmetric NAT & mobile network traversal
+export const PEER_CONFIG = {
+  debug: 1,
+  config: {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:global.stun.twilio.com:3478' },
+      {
+        urls: 'turn:openrelay.metered.ca:80',
+        username: 'openrelay',
+        credential: 'openrelay'
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443',
+        username: 'openrelay',
+        credential: 'openrelay'
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+        username: 'openrelay',
+        credential: 'openrelay'
+      }
+    ]
+  }
+}
+
 // =========================================================================
 // INDEXEDDB REPOSITORY FOR ZERO-LIMIT LOCAL & RECEIVED FILE STORAGE
 // =========================================================================
@@ -177,6 +205,7 @@ export default function MobileConnect({ setCurrentTab }) {
 
   const [activeTab, setActiveTab] = useState(isDropModeParam ? 'mobile_uploader' : 'hub') // 'hub' | 'mobile_uploader' | 'pwa'
   const [selectedIp, setSelectedIp] = useState('')
+  const [qrMode, setQrMode] = useState('wifi') // 'wifi' (Direct LAN Wi-Fi - Khuyên Dùng) | 'p2p' (WebRTC Cloud / 4G)
   const [copied, setCopied] = useState(false)
 
   // WebRTC / P2P State
@@ -416,6 +445,10 @@ export default function MobileConnect({ setCurrentTab }) {
                   origin: { y: 0.75 }
                 })
               } catch (e) {}
+              // Persist polled files into PC IndexedDB
+              setTimeout(() => {
+                newItems.forEach(item => saveFileToIndexedDB(item, null))
+              }, 0)
               return [...newItems, ...currentList]
             }
             return currentList
@@ -435,15 +468,7 @@ export default function MobileConnect({ setCurrentTab }) {
     const targetId = `study-${pcRoomCode}`
 
     try {
-      currentPeer = new Peer(targetId, {
-        debug: 1,
-        config: {
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:global.stun.twilio.com:3478' }
-          ]
-        }
-      })
+      currentPeer = new Peer(targetId, PEER_CONFIG)
 
       currentPeer.on('open', (id) => {
         setPcPeerId(id)
@@ -581,15 +606,7 @@ export default function MobileConnect({ setCurrentTab }) {
         peerInstanceRef.current.destroy()
       }
 
-      const phonePeer = new Peer({
-        debug: 1,
-        config: {
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:global.stun.twilio.com:3478' }
-          ]
-        }
-      })
+      const phonePeer = new Peer(PEER_CONFIG)
 
       phonePeer.on('open', () => {
         const conn = phonePeer.connect(targetPeerId, { reliable: true })
@@ -723,11 +740,19 @@ export default function MobileConnect({ setCurrentTab }) {
   const localHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
   const isLocalHost = localHost === 'localhost' || localHost === '127.0.0.1'
   const lanIp = selectedIp || networkInfo.local_ip || localHost
+  const backendPort = networkInfo.backend_port || 8000
+  const frontendPort = networkInfo.frontend_port || (typeof window !== 'undefined' ? window.location.port : '5173')
+
   const resolvedOrigin = (!isCloudEnv && isLocalHost && lanIp && !lanIp.startsWith('127.'))
-    ? `http://${lanIp}:${networkInfo.frontend_port || (typeof window !== 'undefined' ? window.location.port : '5173')}`
+    ? `http://${lanIp}:${frontendPort}`
     : (typeof window !== 'undefined' ? window.location.origin : '')
 
-  const qrTargetUrl = `${resolvedOrigin}/?tab=mobile&mode=drop&target=${effectivePcCode}`
+  const p2pTargetUrl = `${resolvedOrigin}/?tab=mobile&mode=drop&target=${effectivePcCode}`
+  const wifiPortalUrl = (!isCloudEnv && lanIp && !lanIp.startsWith('127.'))
+    ? `http://${lanIp}:${backendPort}/drop`
+    : (networkInfo.upload_url || `http://127.0.0.1:${backendPort}/drop`)
+
+  const qrTargetUrl = (qrMode === 'wifi' && !isCloudEnv) ? wifiPortalUrl : p2pTargetUrl
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(qrTargetUrl)
@@ -895,11 +920,13 @@ export default function MobileConnect({ setCurrentTab }) {
   const handleMobileUpload = async () => {
     if (selectedMobileFiles.length === 0) return
     setUploading(true)
-    setUploadProgress(10)
+    setUploadProgress(5)
     setUploadSuccessMsg('')
 
     const conn = activeConnRef.current
     const isP2pReady = conn && conn.open
+    let successCount = 0
+    let failedCount = 0
 
     try {
       // Send each file
@@ -908,43 +935,76 @@ export default function MobileConnect({ setCurrentTab }) {
         const safeName = getSafeUploadFileName(file.name)
         const fileId = `drop_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
         const fileType = getFileType(safeName, file.type)
+        let deliveredToPc = false
 
-        // Path A: Direct WebRTC DataChannel Transfer to PC
-        if (isP2pReady) {
-          // 1. Send FILE_START
-          conn.send({
-            type: 'FILE_START',
-            id: fileId,
-            name: safeName,
-            size: file.size,
-            fileType: fileType,
-            mimeType: file.type
+        // Strategy 1: Direct LAN Backend Upload (Fast, reliable, up to 100MB+)
+        try {
+          const fd = new FormData()
+          fd.append('files', file)
+          const res = await axios.post('/api/drop/upload', fd, {
+            timeout: 60000,
+            onUploadProgress: (evt) => {
+              if (evt.total) {
+                const itemProgress = Math.round((evt.loaded / evt.total) * 100)
+                const overall = Math.min(95, Math.round(((i + itemProgress / 100) / selectedMobileFiles.length) * 100))
+                setUploadProgress(overall)
+              }
+            }
           })
-
-          // 2. Chunk file into 64KB slices
-          const CHUNK_SIZE = 64 * 1024
-          let offset = 0
-          while (offset < file.size) {
-            const slice = file.slice(offset, offset + CHUNK_SIZE)
-            const chunkBuffer = await slice.arrayBuffer()
-            conn.send({
-              type: 'FILE_CHUNK',
-              id: fileId,
-              chunk: chunkBuffer
-            })
-            offset += CHUNK_SIZE
-            const percent = Math.min(95, Math.round(((i + offset / file.size) / selectedMobileFiles.length) * 100))
-            setUploadProgress(percent)
+          if (res.data && res.data.status === 'success') {
+            deliveredToPc = true
           }
-
-          // 3. Send FILE_END
-          conn.send({
-            type: 'FILE_END',
-            id: fileId
-          })
+        } catch (backendErr) {
+          // Backend offline or running in cloud environment (normal on Vercel)
         }
 
-        // Path B: Sync across tabs on same device via BroadcastChannel
+        // Strategy 2: WebRTC DataChannel (Direct P2P transmission)
+        if (isP2pReady) {
+          try {
+            // 1. Send FILE_START
+            conn.send({
+              type: 'FILE_START',
+              id: fileId,
+              name: safeName,
+              size: file.size,
+              fileType: fileType,
+              mimeType: file.type
+            })
+
+            // 2. Chunk file into 64KB slices with dataChannel pacing
+            const CHUNK_SIZE = 64 * 1024
+            let offset = 0
+            while (offset < file.size) {
+              const dc = conn.dataChannel || conn._dc
+              if (dc && dc.bufferedAmount > 256 * 1024) {
+                await new Promise(r => setTimeout(r, 20))
+              }
+
+              const slice = file.slice(offset, offset + CHUNK_SIZE)
+              const chunkBuffer = await slice.arrayBuffer()
+              conn.send({
+                type: 'FILE_CHUNK',
+                id: fileId,
+                chunk: chunkBuffer
+              })
+              offset += CHUNK_SIZE
+              const percent = Math.min(95, Math.round(((i + offset / file.size) / selectedMobileFiles.length) * 100))
+              setUploadProgress(percent)
+            }
+
+            // 3. Send FILE_END
+            conn.send({
+              type: 'FILE_END',
+              id: fileId
+            })
+
+            deliveredToPc = true
+          } catch (p2pErr) {
+            console.warn('P2P send error:', p2pErr)
+          }
+        }
+
+        // Strategy 3: Sync across tabs on same device via BroadcastChannel
         if (broadcastChannelRef.current) {
           const item = {
             id: fileId,
@@ -956,21 +1016,16 @@ export default function MobileConnect({ setCurrentTab }) {
             extension: safeName.split('.').pop() || '',
             created_at: new Date().toISOString()
           }
-          broadcastChannelRef.current.postMessage({
-            type: 'NEW_FILE',
-            item: item,
-            blob: file
-          })
+          try {
+            broadcastChannelRef.current.postMessage({
+              type: 'NEW_FILE',
+              item: item,
+              blob: file
+            })
+          } catch (e) {}
         }
 
-        // Path C: Try saving to local backend if running
-        try {
-          const fd = new FormData()
-          fd.append('files', file)
-          axios.post('/api/drop/upload', fd, { timeout: 3000 }).catch(() => {})
-        } catch (e) {}
-
-        // Path D: Save into Phone's IndexedDB as copy
+        // Save into Phone's IndexedDB as copy
         const phoneItem = {
           id: fileId,
           filename: safeName,
@@ -984,13 +1039,22 @@ export default function MobileConnect({ setCurrentTab }) {
         }
         await saveFileToIndexedDB(phoneItem, file)
         setFiles(prev => [phoneItem, ...(Array.isArray(prev) ? prev : [])])
+
+        if (deliveredToPc) {
+          successCount++
+        } else {
+          failedCount++
+        }
       }
 
       setUploadProgress(100)
-      if (isP2pReady) {
-        setUploadSuccessMsg(`🎉 Bắn thành công ${selectedMobileFiles.length} tệp thẳng sang màn hình máy tính!`)
+      if (successCount > 0) {
+        setUploadSuccessMsg(`🎉 Bắn thành công ${successCount} tệp thẳng sang màn hình máy tính!`)
+        try {
+          if (navigator.vibrate) navigator.vibrate([60, 50, 100])
+        } catch (e) {}
       } else {
-        setUploadSuccessMsg(`✅ Đã lưu ${selectedMobileFiles.length} tệp vào kho nhận! (Chưa kết nối P2P với PC)`)
+        setUploadSuccessMsg(`❌ Chưa gửi được sang PC! Điện thoại chưa ghép nối WebRTC hoặc không cùng Wi-Fi với PC. (Đã lưu tạm ${failedCount} tệp trên điện thoại)`)
       }
 
       setSelectedMobileFiles([])
@@ -1152,12 +1216,45 @@ export default function MobileConnect({ setCurrentTab }) {
             <div className="lg:col-span-5 bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-6 flex flex-col items-center justify-center text-center shadow-2xl relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
-              {/* Status Badge: P2P Readiness */}
+              {/* Mode Switcher: Wi-Fi Cục Bộ vs P2P Cloud */}
+              <div className="w-full max-w-sm mb-3.5 flex bg-slate-950 p-1 rounded-2xl border border-slate-800 text-xs font-bold gap-1 shadow-inner">
+                <button
+                  type="button"
+                  onClick={() => setQrMode('wifi')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl transition-all cursor-pointer ${
+                    qrMode === 'wifi'
+                      ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Wifi className="w-3.5 h-3.5" />
+                  <span>Cùng Wi-Fi (Tối Ưu)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setQrMode('p2p')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl transition-all cursor-pointer ${
+                    qrMode === 'p2p'
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>P2P Cloud (4G)</span>
+                </button>
+              </div>
+
+              {/* Status Badge */}
               <div className="w-full max-w-sm mb-3 flex items-center justify-center gap-2 p-1.5 bg-slate-950 rounded-2xl border border-slate-800 text-xs">
-                {p2pConnectedDevices > 0 ? (
+                {qrMode === 'wifi' ? (
+                  <span className="text-emerald-400 font-bold flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>Wi-Fi Cục Bộ: <strong className="font-mono text-emerald-300">{lanIp}:{backendPort}</strong></span>
+                  </span>
+                ) : p2pConnectedDevices > 0 ? (
                   <span className="text-emerald-400 font-bold flex items-center gap-1.5 animate-pulse">
                     <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                    <span>Đã kết nối {p2pConnectedDevices} thiết bị điện thoại!</span>
+                    <span>Đã ghép nối {p2pConnectedDevices} thiết bị điện thoại!</span>
                   </span>
                 ) : (
                   <span className="text-blue-300 font-medium flex items-center gap-1.5">
@@ -1174,18 +1271,36 @@ export default function MobileConnect({ setCurrentTab }) {
                   size={210}
                   level="M"
                   bgColor="#020617"
-                  fgColor="#38bdf8"
+                  fgColor={qrMode === 'wifi' ? '#34d399' : '#38bdf8'}
                   className="rounded-xl shadow-lg"
                 />
               </div>
 
               <div className="font-extrabold text-base text-white mb-1 flex items-center gap-2">
-                <span>Quét Bằng Camera Điện Thoại</span>
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                <span>{qrMode === 'wifi' ? 'Quét Bắn Ảnh Qua Wi-Fi Cực Nhanh' : 'Quét Ghép Nối P2P WebRTC'}</span>
+                <span className={`w-2 h-2 rounded-full ${qrMode === 'wifi' ? 'bg-emerald-400' : 'bg-blue-400'} animate-ping`}></span>
               </div>
               <p className="text-xs text-slate-400 max-w-xs mb-3 leading-relaxed">
-                Mở Camera iPhone hoặc Zalo/Google Lens quét mã QR để ghép nối trực tiếp sang máy tính này!
+                {qrMode === 'wifi'
+                  ? 'Mở Camera iPhone / Android hoặc Zalo quét mã để mở ngay trang tải ảnh trực tiếp vào máy tính 100% không lỗi!'
+                  : 'Ghép nối trực tiếp qua WebRTC P2P không cần chung Wi-Fi, hỗ trợ khi điện thoại dùng mạng 4G/5G!'}
               </p>
+
+              {/* Multi-IP selector if more than 1 network interface detected */}
+              {networkInfo.all_ips && networkInfo.all_ips.length > 1 && (
+                <div className="w-full max-w-sm mb-2.5 flex items-center justify-between bg-slate-950/70 border border-slate-800 rounded-xl px-2.5 py-1 text-[11px]">
+                  <span className="text-slate-400 font-medium">Chọn IP Wi-Fi:</span>
+                  <select
+                    value={selectedIp || networkInfo.local_ip}
+                    onChange={(e) => setSelectedIp(e.target.value)}
+                    className="bg-slate-900 text-emerald-400 font-mono text-xs rounded-lg px-2 py-0.5 border border-slate-700 focus:outline-none"
+                  >
+                    {networkInfo.all_ips.map(ip => (
+                      <option key={ip} value={ip}>{ip}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Real URL box */}
               <div className="w-full max-w-sm bg-slate-900 border border-slate-700/80 rounded-2xl p-2.5 flex items-center gap-2 text-xs font-mono mb-2">
@@ -1193,7 +1308,7 @@ export default function MobileConnect({ setCurrentTab }) {
                 <button
                   onClick={handleCopyLink}
                   title="Sao chép link"
-                  className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                  className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
                 >
                   {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                 </button>
@@ -1208,16 +1323,17 @@ export default function MobileConnect({ setCurrentTab }) {
                 </a>
               </div>
 
+              {/* Connection Code (for P2P mode) */}
               <div className="text-[11px] text-slate-400 bg-slate-950/80 p-3 rounded-2xl border border-emerald-500/20 w-full max-w-sm text-center space-y-1">
                 <div className="flex items-center justify-center gap-1.5 text-emerald-400 font-bold">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span>Mã Kết Nối Nhanh (Nếu không tiện quét QR):</span>
+                  <span>Mã Ghép Nối Nhanh:</span>
                 </div>
                 <div className="text-amber-300 font-mono font-black text-xl select-all tracking-widest uppercase">
                   {effectivePcCode}
                 </div>
                 <div className="text-[10px] text-slate-500 pt-1">
-                  Mở điện thoại vào tab "Giao diện Điện Thoại" và nhập mã trên
+                  Nếu không tiện quét QR, mở tab "Giao diện Điện Thoại" và nhập mã trên
                 </div>
               </div>
             </div>
@@ -1523,19 +1639,27 @@ export default function MobileConnect({ setCurrentTab }) {
                           <>
                             <button
                               onClick={() => {
+                                try {
+                                  localStorage.setItem('studymedia_media_tab', 'nobg')
+                                  localStorage.setItem('studymedia_import_image', JSON.stringify({ url: file.url, name: file.display_name }))
+                                } catch (e) {}
                                 if (setCurrentTab) setCurrentTab('media')
                               }}
                               title="Chuyển sang Xóa Phông AI"
-                              className="p-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-600 text-purple-400 hover:text-white transition-colors"
+                              className="p-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-600 text-purple-400 hover:text-white transition-colors cursor-pointer"
                             >
                               <Scissors className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => {
+                                try {
+                                  localStorage.setItem('studymedia_media_tab', 'antidup')
+                                  localStorage.setItem('studymedia_import_image', JSON.stringify({ url: file.url, name: file.display_name }))
+                                } catch (e) {}
                                 if (setCurrentTab) setCurrentTab('media')
                               }}
                               title="Chuyển sang Lách Trùng Lặp"
-                              className="p-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-600 text-indigo-400 hover:text-white transition-colors"
+                              className="p-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-600 text-indigo-400 hover:text-white transition-colors cursor-pointer"
                             >
                               <ShieldCheck className="w-3.5 h-3.5" />
                             </button>

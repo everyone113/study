@@ -92,7 +92,9 @@ async def get_network_info():
         "all_ips": all_ips,
         "frontend_port": FRONTEND_PORT,
         "backend_port": PORT,
-        "upload_url": f"http://{ip}:{FRONTEND_PORT}/?mode=drop"
+        "upload_url": f"http://{ip}:{PORT}/drop",
+        "portal_url": f"http://{ip}:{PORT}/drop",
+        "frontend_url": f"http://{ip}:{FRONTEND_PORT}/?tab=mobile&mode=drop"
     }
 
 @router.get("/files")
@@ -103,7 +105,7 @@ async def list_dropped_files():
         return []
 
     for entry in DROP_DIR.iterdir():
-        if entry.is_file():
+        if entry.is_file() and not entry.name.startswith("."):
             stat = entry.stat()
             ext = entry.suffix.lower()
             file_type = get_file_type(ext)
@@ -125,6 +127,8 @@ async def list_dropped_files():
                 except Exception:
                     pass
 
+            created_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(stat.st_mtime))
+
             files.append({
                 "id": entry.name,
                 "filename": entry.name,
@@ -132,6 +136,7 @@ async def list_dropped_files():
                 "size": stat.st_size,
                 "size_formatted": f"{len(text_content)} ký tự" if file_type == "text" and text_content else format_size(stat.st_size),
                 "modified_at": stat.st_mtime,
+                "created_at": created_iso,
                 "url": f"/static/wifidrop/{entry.name}",
                 "file_type": file_type,
                 "extension": ext.lstrip("."),

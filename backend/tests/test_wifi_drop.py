@@ -12,7 +12,9 @@ def test_get_network_info():
     data = response.json()
     assert "local_ip" in data
     assert "upload_url" in data
-    assert "5173" in data["upload_url"]
+    assert "drop" in data["upload_url"]
+    assert "frontend_url" in data
+    assert "5173" in data["frontend_url"]
 
 def test_upload_and_list_and_delete_dropped_files():
     # 1. Upload mock photo files

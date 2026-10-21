@@ -18,7 +18,16 @@ import { removeBackgroundClient, compressImageForUpload } from '../utils/bgRemov
 import { processImageAntiDuplicateClient, processVideoAntiDuplicateClient } from '../utils/antiDuplicateClient'
 
 export default function MediaStudio() {
-  const [activeTab, setActiveTab] = useState('downloader') // 'downloader' | 'antidup' | 'nobg'
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      const savedTab = localStorage.getItem('studymedia_media_tab')
+      if (savedTab) {
+        localStorage.removeItem('studymedia_media_tab')
+        return savedTab
+      }
+    } catch (e) {}
+    return 'downloader'
+  })
 
   // Video Downloader states
   const [dlUrl, setDlUrl] = useState('')
@@ -61,6 +70,35 @@ export default function MediaStudio() {
       setBgResult(null)
     }
   }
+
+  // Auto-import image if navigated from WiFi Drop
+  React.useEffect(() => {
+    try {
+      const rawImport = localStorage.getItem('studymedia_import_image')
+      if (rawImport) {
+        localStorage.removeItem('studymedia_import_image')
+        const item = JSON.parse(rawImport)
+        if (item && item.url) {
+          fetch(item.url)
+            .then(res => res.blob())
+            .then(blob => {
+              const file = new File([blob], item.name || 'imported_image.png', { type: blob.type || 'image/png' })
+              if (activeTab === 'nobg') {
+                setBgFile(file)
+                setBgPreview(URL.createObjectURL(file))
+                setBgResult(null)
+              } else if (activeTab === 'antidup') {
+                setAntiDupType('image')
+                setAntiFile(file)
+                setAntiPreview(URL.createObjectURL(file))
+                setAntiResult(null)
+              }
+            })
+            .catch(() => {})
+        }
+      }
+    } catch (e) {}
+  }, [activeTab])
 
   // Helper to trigger direct browser download
   const triggerDirectDownload = async (fileUrl, filename) => {

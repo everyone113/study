@@ -4,8 +4,10 @@ from app.main import app
 
 client = TestClient(app)
 
+import time
+
 def test_auth_register_and_login():
-    test_email = "teststudent1@example.com"
+    test_email = f"teststudent_{int(time.time()*1000)}@example.com"
     test_password = "password123"
     test_name = "Sinh Vien Test"
 
