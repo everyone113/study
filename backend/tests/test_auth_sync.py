@@ -80,7 +80,7 @@ def test_cloud_sync_push_and_pull():
     assert pull_data["data"]["gpa_summary"]["gpa_10"] == 9.2
 
 def test_cloud_sync_check_endpoint():
-    user_id = "usr_synctest_check_888"
+    user_id = f"usr_synctest_check_{int(time.time() * 1000)}"
 
     # Non-existent user check
     check_none = client.get(f"/api/sync/check?user_id={user_id}")
