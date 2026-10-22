@@ -57,3 +57,51 @@ async def test_bg_removal():
         data = res.json()
         assert "result_url" in data
         assert data["result_url"].endswith(".png")
+
+@pytest.mark.anyio
+async def test_remove_watermark_preset():
+    from app.main import app
+    img = Image.new("RGB", (100, 100), color=(120, 150, 200))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    img_bytes = buf.getvalue()
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        files = {"file": ("test_gemini.png", img_bytes, "image/png")}
+        data = {"corner": "bottom-right", "inpaint_radius": "3"}
+        res = await client.post("/api/tools/remove-watermark", files=files, data=data)
+        assert res.status_code == 200, res.text
+        resp = res.json()
+        assert resp["status"] == "success"
+        assert "result_url" in resp
+        assert "data_url" in resp
+        assert resp["width"] == 100
+        assert resp["height"] == 100
+
+@pytest.mark.anyio
+async def test_remove_watermark_custom_mask():
+    from app.main import app
+    img = Image.new("RGB", (64, 64), color=(50, 100, 150))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    img_bytes = buf.getvalue()
+
+    mask = Image.new("L", (64, 64), color=0)
+    for y in range(20, 30):
+        for x in range(20, 30):
+            mask.putpixel((x, y), 255)
+    mask_buf = io.BytesIO()
+    mask.save(mask_buf, format="PNG")
+    mask_bytes = mask_buf.getvalue()
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        files = {
+            "file": ("test_custom.png", img_bytes, "image/png"),
+            "mask": ("test_mask.png", mask_bytes, "image/png")
+        }
+        res = await client.post("/api/tools/remove-watermark", files=files)
+        assert res.status_code == 200, res.text
+        resp = res.json()
+        assert resp["status"] == "success"
+        assert "result_url" in resp
+

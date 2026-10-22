@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import axios from 'axios'
 import {
   Video,
@@ -13,11 +13,18 @@ import {
   Sliders,
   Scissors,
   AlertCircle,
-  X
+  X,
+  Eraser,
+  Brush,
+  RotateCcw,
+  Trash2,
+  Wand2,
+  Share2
 } from 'lucide-react'
 
 import { removeBackgroundClient, compressImageForUpload } from '../utils/bgRemoverClient'
 import { processImageAntiDuplicateClient, processVideoAntiDuplicateClient } from '../utils/antiDuplicateClient'
+import { removeWatermarkHybrid } from '../utils/watermarkRemoverClient'
 
 export default function MediaStudio() {
   const [toast, setToast] = useState(null) // { type: 'success' | 'error' | 'info', message: '' }
@@ -109,8 +116,240 @@ export default function MediaStudio() {
     }
   }
 
+  // Watermark Remover States
+  const [wmFile, setWmFile] = useState(null)
+  const [wmPreview, setWmPreview] = useState(null)
+  const [wmLoading, setWmLoading] = useState(false)
+  const [wmLoadingStep, setWmLoadingStep] = useState('')
+  const [wmResult, setWmResult] = useState(null)
+  const [wmPreset, setWmPreset] = useState('bottom-right') // 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left' | 'all-corners' | 'custom_brush'
+  const [wmBrushSize, setWmBrushSize] = useState(26)
+  const [wmInpaintRadius, setWmInpaintRadius] = useState(4)
+  const [wmDilateRadius, setWmDilateRadius] = useState(5)
+  const [showWmAdvanced, setShowWmAdvanced] = useState(false)
+  const [canvasHistory, setCanvasHistory] = useState([])
+  const [isDrawing, setIsDrawing] = useState(false)
+
+  const brushCanvasRef = useRef(null)
+  const imageDisplayRef = useRef(null)
+
+  const handleWmFileSelect = (file) => {
+    if (!file) return
+    setWmFile(file)
+    setWmPreview(URL.createObjectURL(file))
+    setWmResult(null)
+    setCanvasHistory([])
+  }
+
+  const handleWmImageLoad = (e) => {
+    const img = e.target
+    if (brushCanvasRef.current && img) {
+      brushCanvasRef.current.width = img.naturalWidth || img.width
+      brushCanvasRef.current.height = img.naturalHeight || img.height
+      const ctx = brushCanvasRef.current.getContext('2d')
+      ctx.clearRect(0, 0, brushCanvasRef.current.width, brushCanvasRef.current.height)
+      setCanvasHistory([])
+    }
+  }
+
+  const getCanvasPoint = (e) => {
+    const canvas = brushCanvasRef.current
+    if (!canvas) return null
+    const rect = canvas.getBoundingClientRect()
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY
+    const scaleX = canvas.width / rect.width
+    const scaleY = canvas.height / rect.height
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY
+    }
+  }
+
+  const startBrushDrawing = (e) => {
+    e.preventDefault()
+    const canvas = brushCanvasRef.current
+    if (!canvas) return
+    setIsDrawing(true)
+
+    const ctx = canvas.getContext('2d')
+    const snapshot = ctx.getImageData(0, 0, canvas.width, canvas.height)
+    setCanvasHistory(prev => [...prev.slice(-12), snapshot])
+
+    const pt = getCanvasPoint(e)
+    if (!pt) return
+    ctx.lineWidth = wmBrushSize * (canvas.width / (canvas.getBoundingClientRect().width || 1))
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.strokeStyle = 'rgba(239, 68, 68, 0.75)'
+    ctx.beginPath()
+    ctx.moveTo(pt.x, pt.y)
+    ctx.lineTo(pt.x, pt.y)
+    ctx.stroke()
+  }
+
+  const drawBrush = (e) => {
+    if (!isDrawing) return
+    e.preventDefault()
+    const canvas = brushCanvasRef.current
+    if (!canvas) return
+    const pt = getCanvasPoint(e)
+    if (!pt) return
+    const ctx = canvas.getContext('2d')
+    ctx.lineWidth = wmBrushSize * (canvas.width / (canvas.getBoundingClientRect().width || 1))
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.strokeStyle = 'rgba(239, 68, 68, 0.75)'
+    ctx.lineTo(pt.x, pt.y)
+    ctx.stroke()
+  }
+
+  const stopBrushDrawing = () => {
+    if (!isDrawing) return
+    setIsDrawing(false)
+    const canvas = brushCanvasRef.current
+    if (canvas) {
+      const ctx = canvas.getContext('2d')
+      ctx.closePath()
+    }
+  }
+
+  const undoLastStroke = () => {
+    if (canvasHistory.length === 0) return
+    const newHist = [...canvasHistory]
+    const lastSnapshot = newHist.pop()
+    setCanvasHistory(newHist)
+    const canvas = brushCanvasRef.current
+    if (canvas && lastSnapshot) {
+      const ctx = canvas.getContext('2d')
+      ctx.putImageData(lastSnapshot, 0, 0)
+    }
+  }
+
+  const clearBrushCanvas = () => {
+    const canvas = brushCanvasRef.current
+    if (canvas) {
+      const ctx = canvas.getContext('2d')
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      setCanvasHistory([])
+    }
+  }
+
+  // Ctrl+V Paste handler for Watermark Tab
+  useEffect(() => {
+    const handlePaste = (e) => {
+      if (activeTab !== 'clean_watermark') return
+      const items = e.clipboardData?.items
+      if (!items) return
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile()
+          if (file) {
+            handleWmFileSelect(file)
+            showToast('Đã dán ảnh từ bộ nhớ tạm (Clipboard)', 'success')
+            break
+          }
+        }
+      }
+    }
+    window.addEventListener('paste', handlePaste)
+    return () => window.removeEventListener('paste', handlePaste)
+  }, [activeTab])
+
+  const handleRemoveWatermark = async () => {
+    if (!wmFile) {
+      showToast('Vui lòng chọn hoặc dán ảnh cần xóa logo trước!', 'error')
+      return
+    }
+
+    setWmLoading(true)
+    setWmLoadingStep('Đang chuẩn bị ảnh và định vị watermark...')
+
+    try {
+      let maskBlob = null
+      if (wmPreset === 'custom_brush' && brushCanvasRef.current) {
+        const brushCanvas = brushCanvasRef.current
+        const maskCanvas = document.createElement('canvas')
+        maskCanvas.width = brushCanvas.width
+        maskCanvas.height = brushCanvas.height
+        const mCtx = maskCanvas.getContext('2d')
+        mCtx.fillStyle = '#000000'
+        mCtx.fillRect(0, 0, maskCanvas.width, maskCanvas.height)
+
+        const bCtx = brushCanvas.getContext('2d')
+        const bData = bCtx.getImageData(0, 0, brushCanvas.width, brushCanvas.height)
+        const mData = mCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height)
+
+        let hasPainted = false
+        for (let i = 0; i < bData.data.length; i += 4) {
+          if (bData.data[i + 3] > 20) {
+            mData.data[i] = 255
+            mData.data[i + 1] = 255
+            mData.data[i + 2] = 255
+            mData.data[i + 3] = 255
+            hasPainted = true
+          }
+        }
+        if (!hasPainted) {
+          showToast('Vui lòng dùng cọ tô lên vùng logo cần xóa trên ảnh!', 'error')
+          setWmLoading(false)
+          return
+        }
+        mCtx.putImageData(mData, 0, 0)
+        maskBlob = await new Promise(r => maskCanvas.toBlob(r, 'image/png'))
+      }
+
+      const res = await removeWatermarkHybrid(wmFile, {
+        maskBlob,
+        corner: wmPreset === 'custom_brush' ? null : wmPreset,
+        inpaintRadius: wmInpaintRadius,
+        dilateRadius: wmDilateRadius,
+        onProgress: (step) => setWmLoadingStep(step)
+      })
+
+      setWmResult(res)
+      showToast(res.message || 'Xóa logo thành công!', 'success')
+    } catch (err) {
+      console.error('Lỗi xóa logo:', err)
+      showToast('Lỗi khi xóa logo: ' + (err.message || 'Vui lòng thử lại'), 'error')
+    } finally {
+      setWmLoading(false)
+    }
+  }
+
+  const handleTransferToBgRemover = async () => {
+    if (!wmResult?.data_url && !wmResult?.result_url) return
+    try {
+      const url = wmResult.data_url || wmResult.result_url
+      const resp = await fetch(url)
+      const blob = await resp.blob()
+      const cleanFile = new File([blob], 'clean_' + (wmFile?.name || 'image.png'), { type: 'image/png' })
+      setBgFile(cleanFile)
+      setBgPreview(URL.createObjectURL(cleanFile))
+      setBgResult(null)
+      setActiveTab('nobg')
+      showToast('Đã chuyển ảnh sạch logo sang Tách Nền AI!', 'success')
+    } catch (e) {
+      showToast('Không thể chuyển ảnh: ' + e.message, 'error')
+    }
+  }
+
+  const handleTransferToWifiDrop = () => {
+    if (!wmResult?.data_url && !wmResult?.result_url) return
+    try {
+      const url = wmResult.data_url || wmResult.result_url
+      localStorage.setItem('studymedia_import_image', JSON.stringify({
+        url,
+        name: wmResult.result_filename || 'clean_image.png'
+      }))
+      showToast('Đã lưu ảnh! Mở tab WiFi Drop để gửi ngay sang điện thoại.', 'success')
+    } catch (e) {
+      showToast('Lỗi lưu cache: ' + e.message, 'error')
+    }
+  }
+
   // Auto-import image if navigated from WiFi Drop
-  React.useEffect(() => {
+  useEffect(() => {
     try {
       const rawImport = localStorage.getItem('studymedia_import_image')
       if (rawImport) {
@@ -130,6 +369,8 @@ export default function MediaStudio() {
                 setAntiFile(file)
                 setAntiPreview(URL.createObjectURL(file))
                 setAntiResult(null)
+              } else if (activeTab === 'clean_watermark') {
+                handleWmFileSelect(file)
               }
             })
             .catch(() => {})
@@ -396,28 +637,35 @@ export default function MediaStudio() {
               Xưởng Sáng Tạo Media & Lách Bản Quyền MXH
             </h2>
             <p className="text-xs text-slate-400 mt-1">
-              Bộ công cụ tải video sạch logo, tách nền ảnh và can thiệp chữ ký số video để đăng mạng xã hội không bị quét trùng
+              Bộ công cụ tải video sạch logo, xóa watermark Gemini AI, tách nền ảnh và can thiệp chữ ký số video
             </p>
           </div>
 
-          <div className="flex bg-slate-800 p-1 rounded-2xl text-xs font-semibold">
+          <div className="flex flex-wrap bg-slate-800 p-1 rounded-2xl text-xs font-semibold gap-1">
             <button
               onClick={() => setActiveTab('downloader')}
-              className={`px-4 py-2 rounded-xl transition-all ${activeTab === 'downloader' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+              className={`px-3 sm:px-4 py-2 rounded-xl transition-all ${activeTab === 'downloader' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
             >
               Tải Video Sạch Logo
             </button>
             <button
               onClick={() => setActiveTab('antidup')}
-              className={`px-4 py-2 rounded-xl transition-all ${activeTab === 'antidup' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+              className={`px-3 sm:px-4 py-2 rounded-xl transition-all ${activeTab === 'antidup' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
             >
               Lách Quét Trùng Lặp
             </button>
             <button
               onClick={() => setActiveTab('nobg')}
-              className={`px-4 py-2 rounded-xl transition-all ${activeTab === 'nobg' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+              className={`px-3 sm:px-4 py-2 rounded-xl transition-all ${activeTab === 'nobg' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
             >
               Tách Nền AI
+            </button>
+            <button
+              onClick={() => setActiveTab('clean_watermark')}
+              className={`px-3 sm:px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${activeTab === 'clean_watermark' ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-pink-300" />
+              <span>Xóa Logo Gemini</span>
             </button>
           </div>
         </div>
@@ -924,6 +1172,449 @@ export default function MediaStudio() {
                   >
                     <Download className="w-4 h-4" />
                     <span>Tải Ảnh PNG Trong Suốt</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 4: WATERMARK & GEMINI LOGO REMOVER */}
+      {activeTab === 'clean_watermark' && (
+        <div className="space-y-6 animate-in fade-in">
+          {/* Main Control Card */}
+          <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div>
+                <h3 className="font-bold text-base text-white flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-pink-400" />
+                  Xóa Logo Google Gemini & Watermark AI Siêu Tốc
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Thuật toán Inpainting tự động lấp đầy chi tiết vùng watermark dựa trên cấu trúc ảnh gốc, không để lại vết mờ hay biến dạng.
+                </p>
+              </div>
+
+              {wmFile && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWmFile(null)
+                    setWmPreview(null)
+                    setWmResult(null)
+                    clearBrushCanvas()
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 flex items-center gap-1.5 self-start sm:self-auto"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Chọn ảnh khác</span>
+                </button>
+              )}
+            </div>
+
+            {/* Presets Selection Bar */}
+            <div className="mb-5 space-y-2">
+              <label className="text-xs font-semibold text-slate-300 block">
+                Chế độ định vị Watermark:
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setWmPreset('bottom-right')}
+                  className={`p-2.5 rounded-2xl border text-left transition-all relative overflow-hidden ${
+                    wmPreset === 'bottom-right'
+                      ? 'bg-purple-950/60 border-purple-500 text-white shadow-md shadow-purple-950/40'
+                      : 'bg-slate-800/60 border-slate-700/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold">Góc Dưới Phải</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-purple-600 text-white font-semibold">Gemini AI</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Vị trí chuẩn 99% logo Gemini</p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setWmPreset('bottom-left')}
+                  className={`p-2.5 rounded-2xl border text-left transition-all ${
+                    wmPreset === 'bottom-left'
+                      ? 'bg-purple-950/60 border-purple-500 text-white shadow-md shadow-purple-950/40'
+                      : 'bg-slate-800/60 border-slate-700/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                  }`}
+                >
+                  <span className="text-xs font-bold block">Góc Dưới Trái</span>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Logo hoặc nhãn bản quyền trái</p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setWmPreset('top-right')}
+                  className={`p-2.5 rounded-2xl border text-left transition-all ${
+                    wmPreset === 'top-right'
+                      ? 'bg-purple-950/60 border-purple-500 text-white shadow-md shadow-purple-950/40'
+                      : 'bg-slate-800/60 border-slate-700/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                  }`}
+                >
+                  <span className="text-xs font-bold block">Góc Trên Phải</span>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Watermark / logo kênh / icon</p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setWmPreset('all-corners')}
+                  className={`p-2.5 rounded-2xl border text-left transition-all ${
+                    wmPreset === 'all-corners'
+                      ? 'bg-purple-950/60 border-purple-500 text-white shadow-md shadow-purple-950/40'
+                      : 'bg-slate-800/60 border-slate-700/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                  }`}
+                >
+                  <span className="text-xs font-bold block">Cả 4 Góc Ảnh</span>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Xóa sạch toàn bộ viền góc</p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setWmPreset('custom_brush')}
+                  className={`p-2.5 rounded-2xl border text-left transition-all ${
+                    wmPreset === 'custom_brush'
+                      ? 'bg-pink-950/60 border-pink-500 text-white shadow-md shadow-pink-950/40'
+                      : 'bg-slate-800/60 border-slate-700/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold">Cọ Vẽ Thủ Công</span>
+                    <Brush className="w-3.5 h-3.5 text-pink-400" />
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Tô tự do vị trí bất kỳ trên ảnh</p>
+                </button>
+              </div>
+            </div>
+
+            {/* Brush Controls Bar (When in custom_brush mode) */}
+            {wmPreset === 'custom_brush' && (
+              <div className="mb-5 p-4 rounded-2xl bg-slate-800/80 border border-pink-500/30 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-semibold text-pink-300 flex items-center gap-1.5">
+                    <Brush className="w-4 h-4" /> Cỡ nét cọ:
+                  </span>
+                  <input
+                    type="range"
+                    min="10"
+                    max="70"
+                    value={wmBrushSize}
+                    onChange={(e) => setWmBrushSize(Number(e.target.value))}
+                    className="w-28 sm:w-40 accent-pink-500"
+                  />
+                  <span className="text-xs font-mono font-bold text-white bg-slate-700 px-2 py-0.5 rounded">
+                    {wmBrushSize}px
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={undoLastStroke}
+                    disabled={canvasHistory.length === 0}
+                    className="px-3 py-1.5 rounded-xl bg-slate-700 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium text-slate-200 flex items-center gap-1.5"
+                    title="Hoàn tác nét vẽ trước"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Hoàn tác ({canvasHistory.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearBrushCanvas}
+                    className="px-3 py-1.5 rounded-xl bg-rose-950/60 hover:bg-rose-900 border border-rose-500/40 text-xs font-medium text-rose-300 flex items-center gap-1.5"
+                    title="Xóa toàn bộ vùng tô"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Xóa vùng tô</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Upload Zone / Canvas Editor Area */}
+            {!wmPreview ? (
+              <div
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  const file = e.dataTransfer.files?.[0]
+                  if (file && file.type.startsWith('image/')) {
+                    handleWmFileSelect(file)
+                  }
+                }}
+                className="border-2 border-dashed border-slate-700 hover:border-purple-500/60 rounded-3xl p-8 sm:p-12 text-center transition-all bg-slate-950/40 cursor-pointer relative group"
+              >
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleWmFileSelect(e.target.files?.[0])}
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                />
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-purple-600/20 to-pink-600/20 border border-purple-500/30 flex items-center justify-center mx-auto mb-4 group-hover:scale-105 transition-transform">
+                  <Sparkles className="w-8 h-8 text-pink-400" />
+                </div>
+                <h4 className="font-bold text-white text-base mb-1">
+                  Kéo thả ảnh cần xóa logo vào đây, hoặc bấm để tải lên
+                </h4>
+                <p className="text-xs text-slate-400 max-w-md mx-auto mb-3">
+                  Hoặc bấm <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-300 font-mono text-[11px]">Ctrl + V</kbd> bất cứ lúc nào để dán ảnh trực tiếp từ bộ nhớ tạm
+                </p>
+                <span className="inline-block text-[11px] text-purple-300 bg-purple-950/40 border border-purple-800/40 px-3 py-1 rounded-full">
+                  Khử sạch 100% biểu tượng ngôi sao 4 cánh của Google Gemini, chữ ký, ngày giờ
+                </span>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Visual Workspace Container */}
+                <div className="relative rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 flex items-center justify-center min-h-[320px] max-h-[640px] p-2 select-none">
+                  <div className="relative max-w-full max-h-[620px] inline-block">
+                    <img
+                      ref={imageDisplayRef}
+                      src={wmPreview}
+                      alt="Ảnh cần xóa logo"
+                      onLoad={handleWmImageLoad}
+                      className="max-w-full max-h-[620px] object-contain rounded-xl block pointer-events-none"
+                    />
+
+                    {/* Overlay: Custom Brush Canvas */}
+                    {wmPreset === 'custom_brush' && (
+                      <canvas
+                        ref={brushCanvasRef}
+                        onMouseDown={startBrushDrawing}
+                        onMouseMove={drawBrush}
+                        onMouseUp={stopBrushDrawing}
+                        onMouseLeave={stopBrushDrawing}
+                        onTouchStart={startBrushDrawing}
+                        onTouchMove={drawBrush}
+                        onTouchEnd={stopBrushDrawing}
+                        className="absolute inset-0 w-full h-full cursor-crosshair touch-none"
+                      />
+                    )}
+
+                    {/* Overlay: Preset Bounding Boxes */}
+                    {wmPreset === 'bottom-right' && (
+                      <div
+                        className="absolute bottom-2 right-2 border-2 border-dashed border-rose-400 bg-rose-500/25 rounded-xl pointer-events-none flex items-center justify-center p-2 backdrop-blur-[1px] animate-pulse"
+                        style={{ width: '18%', height: '14%', minWidth: '70px', minHeight: '40px' }}
+                      >
+                        <span className="text-[10px] text-white font-bold bg-rose-600/90 px-1.5 py-0.5 rounded shadow">
+                          Logo Gemini
+                        </span>
+                      </div>
+                    )}
+
+                    {wmPreset === 'bottom-left' && (
+                      <div
+                        className="absolute bottom-2 left-2 border-2 border-dashed border-rose-400 bg-rose-500/25 rounded-xl pointer-events-none flex items-center justify-center p-2 backdrop-blur-[1px] animate-pulse"
+                        style={{ width: '18%', height: '14%', minWidth: '70px', minHeight: '40px' }}
+                      >
+                        <span className="text-[10px] text-white font-bold bg-rose-600/90 px-1.5 py-0.5 rounded shadow">
+                          Góc Dưới Trái
+                        </span>
+                      </div>
+                    )}
+
+                    {wmPreset === 'top-right' && (
+                      <div
+                        className="absolute top-2 right-2 border-2 border-dashed border-rose-400 bg-rose-500/25 rounded-xl pointer-events-none flex items-center justify-center p-2 backdrop-blur-[1px] animate-pulse"
+                        style={{ width: '18%', height: '14%', minWidth: '70px', minHeight: '40px' }}
+                      >
+                        <span className="text-[10px] text-white font-bold bg-rose-600/90 px-1.5 py-0.5 rounded shadow">
+                          Góc Trên Phải
+                        </span>
+                      </div>
+                    )}
+
+                    {wmPreset === 'all-corners' && (
+                      <>
+                        <div className="absolute top-2 left-2 border-2 border-dashed border-rose-400 bg-rose-500/25 rounded-xl pointer-events-none w-[18%] h-[14%] min-w-[60px] min-h-[36px]" />
+                        <div className="absolute top-2 right-2 border-2 border-dashed border-rose-400 bg-rose-500/25 rounded-xl pointer-events-none w-[18%] h-[14%] min-w-[60px] min-h-[36px]" />
+                        <div className="absolute bottom-2 left-2 border-2 border-dashed border-rose-400 bg-rose-500/25 rounded-xl pointer-events-none w-[18%] h-[14%] min-w-[60px] min-h-[36px]" />
+                        <div className="absolute bottom-2 right-2 border-2 border-dashed border-rose-400 bg-rose-500/25 rounded-xl pointer-events-none w-[18%] h-[14%] min-w-[60px] min-h-[36px]" />
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Helpful Instruction Tip */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
+                  {wmPreset === 'custom_brush' ? (
+                    <p className="text-pink-300 flex items-center gap-1.5">
+                      <Brush className="w-4 h-4 shrink-0" />
+                      Nhấn giữ chuột hoặc chạm ngón tay để vẽ vệt đỏ đè lên logo bạn muốn xóa.
+                    </p>
+                  ) : (
+                    <p className="text-slate-400 flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-purple-400 shrink-0" />
+                      Khu vực màu đỏ viền nét đứt biểu thị vùng logo sẽ được tự động xóa sạch.
+                    </p>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setShowWmAdvanced(!showWmAdvanced)}
+                    className="text-xs text-slate-400 hover:text-white flex items-center gap-1 shrink-0"
+                  >
+                    <Sliders className="w-3.5 h-3.5" />
+                    <span>{showWmAdvanced ? 'Ẩn thông số thuật toán' : 'Thông số nâng cao'}</span>
+                  </button>
+                </div>
+
+                {/* Advanced Inpainting Settings Slider */}
+                {showWmAdvanced && (
+                  <div className="p-4 rounded-2xl bg-slate-800/70 border border-slate-700/80 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-300 font-medium">Bán kính nội suy lấp đầy (Inpaint Radius):</span>
+                        <span className="font-mono text-purple-400 font-bold">{wmInpaintRadius}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="2"
+                        max="10"
+                        value={wmInpaintRadius}
+                        onChange={(e) => setWmInpaintRadius(Number(e.target.value))}
+                        className="w-full accent-purple-500"
+                      />
+                      <p className="text-[10px] text-slate-400">Độ rộng vùng tham chiếu lân cận để pha trộn màu nền.</p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-300 font-medium">Độ lan viền mặt nạ (Dilation):</span>
+                        <span className="font-mono text-purple-400 font-bold">{wmDilateRadius}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="2"
+                        max="12"
+                        value={wmDilateRadius}
+                        onChange={(e) => setWmDilateRadius(Number(e.target.value))}
+                        className="w-full accent-purple-500"
+                      />
+                      <p className="text-[10px] text-slate-400">Mở rộng mặt nạ để nuốt trọn quầng hào quang bán trong suốt.</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Trigger Button */}
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={handleRemoveWatermark}
+                    disabled={wmLoading}
+                    className="w-full py-4 rounded-2xl bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 hover:opacity-95 disabled:opacity-50 text-white font-bold text-sm shadow-xl shadow-purple-900/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  >
+                    {wmLoading ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <span>{wmLoadingStep || 'Đang xử lý inpainting...'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 className="w-5 h-5 text-pink-200" />
+                        <span>Bắt Đầu Xóa Logo & Phục Hồi Ảnh</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Clean Result Card */}
+          {wmResult && (
+            <div className="bg-slate-900 border border-purple-500/40 rounded-3xl p-6 shadow-2xl space-y-6 animate-in fade-in">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                  <h4 className="font-bold text-base text-white">Ảnh Đã Xóa Logo Sạch Sẽ & Tự Nhiên!</h4>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs px-2.5 py-1 rounded-full bg-purple-900/40 text-purple-300 border border-purple-700/40 font-medium">
+                    {wmResult.engine === 'opencv_backend' ? '✨ OpenCV Inpainting Telea' : '⚡ Web Inpainting Siêu Tốc'}
+                  </span>
+                  {wmResult.elapsed_seconds && (
+                    <span className="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                      {wmResult.elapsed_seconds}s
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Side-by-Side Comparison */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Original */}
+                {wmPreview && (
+                  <div className="space-y-2">
+                    <span className="text-xs font-semibold text-slate-400 flex items-center gap-1">
+                      <span>Ảnh Gốc (Còn Watermark / Logo):</span>
+                    </span>
+                    <div className="w-full h-72 rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 flex items-center justify-center p-2">
+                      <img src={wmPreview} alt="Ảnh Gốc" className="max-w-full max-h-full object-contain" />
+                    </div>
+                  </div>
+                )}
+
+                {/* Clean Result */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Kết Quả Đã Phục Hồi Sạch Logo:</span>
+                    </span>
+                    {wmResult.width && wmResult.height && (
+                      <span className="text-[11px] text-slate-500">{wmResult.width} × {wmResult.height}px</span>
+                    )}
+                  </div>
+                  <div className="w-full h-72 rounded-2xl overflow-hidden border border-emerald-500/30 bg-slate-950 flex items-center justify-center p-2 shadow-inner">
+                    <img
+                      src={wmResult.data_url || wmResult.result_url}
+                      alt="Ảnh đã xóa logo"
+                      className="max-w-full max-h-full object-contain drop-shadow-xl"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Toolbar */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2 border-t border-slate-800">
+                <p className="text-xs text-slate-400">
+                  Ảnh đã sẵn sàng tải về với độ phân giải đầy đủ, không giảm chất lượng.
+                </p>
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={handleTransferToBgRemover}
+                    className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700 flex items-center gap-1.5 transition-all"
+                    title="Chuyển sang Tách Nền AI"
+                  >
+                    <Scissors className="w-4 h-4 text-purple-400" />
+                    <span>Tách Nền Tiếp</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleTransferToWifiDrop}
+                    className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700 flex items-center gap-1.5 transition-all"
+                    title="Chuyển sang WiFi Drop để gửi sang điện thoại"
+                  >
+                    <Share2 className="w-4 h-4 text-sky-400" />
+                    <span>Sang WiFi Drop</span>
+                  </button>
+
+                  <a
+                    href={wmResult.data_url || wmResult.result_url}
+                    download={wmResult.result_filename || 'anh_sach_logo.png'}
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 whitespace-nowrap transition-all"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Tải Ảnh Đã Làm Sạch</span>
                   </a>
                 </div>
               </div>

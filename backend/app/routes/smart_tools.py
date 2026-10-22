@@ -6,6 +6,7 @@ import aiosqlite
 from app.database import get_db
 from app.services.tts_service import generate_speech, VOICES
 from app.services.bg_remover import remove_background
+from app.services.watermark_remover import remove_watermark
 
 router = APIRouter(prefix="/api/tools", tags=["Smart Tools"])
 
@@ -108,3 +109,43 @@ async def summarize_text(req: SummarizeRequest):
         "generated_quiz": questions,
         "summary": " ".join(key_points)
     }
+
+@router.post("/remove-watermark")
+async def remove_watermark_endpoint(
+    file: UploadFile = File(...),
+    mask: Optional[UploadFile] = File(None),
+    corner: Optional[str] = Form(None),
+    box_x: Optional[int] = Form(None),
+    box_y: Optional[int] = Form(None),
+    box_w: Optional[int] = Form(None),
+    box_h: Optional[int] = Form(None),
+    inpaint_radius: int = Form(4),
+    dilate_radius: int = Form(5),
+    method: str = Form("telea")
+):
+    try:
+        content = await file.read()
+        mask_content = None
+        if mask:
+            mask_content = await mask.read()
+            if len(mask_content) == 0:
+                mask_content = None
+
+        box = None
+        if box_x is not None and box_y is not None and box_w is not None and box_h is not None:
+            box = {"x": box_x, "y": box_y, "w": box_w, "h": box_h}
+
+        res = remove_watermark(
+            image_bytes=content,
+            original_filename=file.filename or "image.png",
+            mask_bytes=mask_content,
+            corner=corner if corner else None,
+            box=box,
+            inpaint_radius=inpaint_radius,
+            dilate_radius=dilate_radius,
+            method=method
+        )
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi xóa watermark: {str(e)}")
+
