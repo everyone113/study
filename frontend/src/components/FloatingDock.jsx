@@ -13,6 +13,7 @@ import {
   Sparkles,
   QrCode,
   Network,
+  ScanSearch,
   ChevronDown,
   ChevronUp
 } from 'lucide-react'
@@ -31,6 +32,7 @@ export const DOCK_ITEMS = [
   { id: 'media', label: 'Xưởng Sáng Tạo Media', badge: 'Video/Audio', icon: Video, color: 'text-purple-400', group: 'tools' },
   { id: 'smart', label: 'Tiện Ích AI Thông Minh', badge: 'AI Tool', icon: Sparkles, color: 'text-yellow-400', group: 'tools' },
   { id: 'mobile', label: 'WiFi Drop Bắn File', badge: 'P2P QR', icon: QrCode, color: 'text-teal-400', group: 'tools' },
+  { id: 'forensics', label: 'Photo Forensics Studio', badge: 'Forensics', icon: ScanSearch, color: 'text-cyan-400', group: 'tools' },
 ]
 
 function DockIcon({ item, currentTab, setCurrentTab, mouseX }) {

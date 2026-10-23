@@ -20,6 +20,7 @@ import AnatomyAtlas from './pages/AnatomyAtlas'
 import AnimationLab from './pages/AnimationLab'
 import UIKitStudio from './pages/UIKitStudio'
 import MindmapStudioView from './views/MindmapStudioView'
+import ForensicsStudioView from './views/ForensicsStudioView'
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -76,6 +77,8 @@ class ErrorBoundary extends React.Component {
 function AppContent() {
   const [currentTab, setCurrentTab] = useState(() => {
     try {
+      const pathname = window.location.pathname.replace(/^\//, '').toLowerCase()
+      if (pathname === 'forensics') return 'forensics'
       const params = new URLSearchParams(window.location.search)
       if (params.get('mode') === 'drop') return 'mobile'
       const tab = params.get('tab')
@@ -83,6 +86,19 @@ function AppContent() {
     } catch (e) {}
     return 'dashboard'
   })
+
+  // Synchronize browser history and URL with active tab
+  React.useEffect(() => {
+    try {
+      if (currentTab === 'forensics') {
+        if (window.location.pathname !== '/forensics') {
+          window.history.pushState({}, '', '/forensics')
+        }
+      } else if (window.location.pathname === '/forensics') {
+        window.history.pushState({}, '', `/?tab=${currentTab}`)
+      }
+    } catch (e) {}
+  }, [currentTab])
 
   // Floating Dock state (default: true for instant interactive experience)
   const [showDock, setShowDock] = useState(() => {
@@ -129,6 +145,8 @@ function AppContent() {
         return <SmartUtilities />
       case 'mobile':
         return <MobileConnect setCurrentTab={setCurrentTab} />
+      case 'forensics':
+        return <ForensicsStudioView setCurrentTab={setCurrentTab} />
       default:
         return <Dashboard setCurrentTab={setCurrentTab} />
     }

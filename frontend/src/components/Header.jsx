@@ -27,7 +27,8 @@ export default function Header({ currentTab, setCurrentTab, showDock, setShowDoc
     { title: 'Phòng Thí Nghiệm Animation 60 FPS', tab: 'animation', keyword: 'animation motion gsap framer animejs' },
     { title: 'Xưởng Sáng Tạo Media & Lách Trùng', tab: 'media', keyword: 'media video tiktok youtube tach nen nobg' },
     { title: 'Tiện Ích AI (Dịch Sub, TTS, Flashcard)', tab: 'smart', keyword: 'ai tien ich dich sub tts voice flashcard' },
-    { title: 'WiFi Drop & Bắn Ảnh Không Dây', tab: 'mobile', keyword: 'wifi drop ban anh ban file p2p mobile' }
+    { title: 'WiFi Drop & Bắn Ảnh Không Dây', tab: 'mobile', keyword: 'wifi drop ban anh ban file p2p mobile' },
+    { title: 'Giám Định Ảnh Số Chuyên Sâu (Photo Forensics Studio)', tab: 'forensics', keyword: 'forensics giam dinh anh exif ela gps suncalc bong nang loupe kinh lup cat ghep osint' }
   ]
 
   const filtered = searchQuery.trim()

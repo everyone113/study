@@ -12,7 +12,8 @@ import {
   Video,
   Sparkles,
   QrCode,
-  Network
+  Network,
+  ScanSearch
 } from 'lucide-react'
 
 export const NAV_ITEMS = [
@@ -167,6 +168,19 @@ export const NAV_ITEMS = [
     iconBg: 'bg-teal-500/10 group-hover:bg-teal-500/20 text-teal-400',
     badgeStyle: 'bg-teal-950/80 text-teal-300 border border-teal-800/60',
     activeBg: 'bg-gradient-to-r from-teal-600 to-cyan-600 text-white shadow-lg shadow-teal-600/30'
+  },
+  {
+    id: 'forensics',
+    label: 'Giám Định Ảnh Forensics',
+    shortLabel: 'Forensics',
+    description: 'EXIF, ELA cắt ghép, bóng nắng SunCalc & kính lúp',
+    icon: ScanSearch,
+    badge: 'Studio',
+    category: 'media',
+    color: 'text-cyan-400',
+    iconBg: 'bg-cyan-500/10 group-hover:bg-cyan-500/20 text-cyan-400',
+    badgeStyle: 'bg-cyan-950/80 text-cyan-300 border border-cyan-800/60',
+    activeBg: 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-600/30'
   },
 ]
 
