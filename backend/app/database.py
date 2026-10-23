@@ -117,4 +117,22 @@ async def init_db():
         );
         """)
 
+        await db.execute("""
+        CREATE TABLE IF NOT EXISTS mindmaps (
+            id TEXT PRIMARY KEY,
+            user_id TEXT DEFAULT 'guest',
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            root_node TEXT NOT NULL,
+            tags TEXT DEFAULT 'General',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        try:
+            await db.execute("ALTER TABLE user_sync ADD COLUMN mindmaps TEXT DEFAULT '[]'")
+        except Exception:
+            pass
+
         await db.commit()

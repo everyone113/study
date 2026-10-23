@@ -36,6 +36,7 @@ from app.routes.subtitles import router as subtitles_router
 from app.routes.wifi_drop import router as wifi_drop_router
 from app.routes.auth import router as auth_router
 from app.routes.sync import router as sync_router
+from app.routes.mindmap import router as mindmap_router
 
 app.include_router(academic_router)
 app.include_router(notes_router)
@@ -47,6 +48,7 @@ app.include_router(subtitles_router)
 app.include_router(wifi_drop_router)
 app.include_router(auth_router)
 app.include_router(sync_router)
+app.include_router(mindmap_router)
 
 # Serve downloads, processed media, documents, and wifi drop
 app.mount("/static/downloads", StaticFiles(directory=DOWNLOADS_DIR), name="downloads")

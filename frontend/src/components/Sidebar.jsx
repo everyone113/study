@@ -11,7 +11,8 @@ import {
   Flame,
   Video,
   Sparkles,
-  QrCode
+  QrCode,
+  Network
 } from 'lucide-react'
 
 export const NAV_ITEMS = [
@@ -88,6 +89,19 @@ export const NAV_ITEMS = [
     iconBg: 'bg-amber-500/10 group-hover:bg-amber-500/20 text-amber-400',
     badgeStyle: 'bg-amber-950/80 text-amber-300 border border-amber-800/60',
     activeBg: 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-lg shadow-amber-600/30'
+  },
+  {
+    id: 'mindmap',
+    label: 'Xưởng Sơ Đồ Tư Duy',
+    shortLabel: 'Sơ Đồ Tư Duy',
+    description: 'AI Mindmap Studio, Infinite Canvas & Âm thanh Focus',
+    icon: Network,
+    badge: 'Mới',
+    category: 'study',
+    color: 'text-violet-400',
+    iconBg: 'bg-violet-500/10 group-hover:bg-violet-500/20 text-violet-400',
+    badgeStyle: 'bg-violet-950/80 text-violet-300 border border-violet-800/60',
+    activeBg: 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-600/35 rounded-2xl'
   },
   {
     id: 'uikit',

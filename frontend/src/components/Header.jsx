@@ -22,6 +22,7 @@ export default function Header({ currentTab, setCurrentTab, showDock, setShowDoc
     { title: 'Atlas Giải Phẫu Học 3D (Y Khoa)', tab: 'anatomy', keyword: 'giai phau 3d y khoa svitylo tim nao' },
     { title: 'Kho Tài Liệu & Tải File Trực Tuyến', tab: 'documents', keyword: 'tai lieu giao trinh de thi pdf' },
     { title: 'Phòng Lập Trình & Ôn Code (Java/C++)', tab: 'code', keyword: 'code java c++ python compiler lap trinh' },
+    { title: 'Xưởng Sơ Đồ Tư Duy & Trực Quan Hóa (AI Mindmap Studio)', tab: 'mindmap', keyword: 'mindmap so do tu duy infinite canvas node flashcard soundscape' },
     { title: 'Kho Giao Diện Web & UI Kit Studio', tab: 'uikit', keyword: 'ui kit giao dien web tailwind dark mode' },
     { title: 'Phòng Thí Nghiệm Animation 60 FPS', tab: 'animation', keyword: 'animation motion gsap framer animejs' },
     { title: 'Xưởng Sáng Tạo Media & Lách Trùng', tab: 'media', keyword: 'media video tiktok youtube tach nen nobg' },

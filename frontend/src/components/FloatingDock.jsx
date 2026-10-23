@@ -12,6 +12,7 @@ import {
   Video,
   Sparkles,
   QrCode,
+  Network,
   ChevronDown,
   ChevronUp
 } from 'lucide-react'
@@ -24,6 +25,7 @@ export const DOCK_ITEMS = [
   { id: 'anatomy', label: 'Atlas Giải Phẫu 3D', badge: 'Y Khoa', icon: HeartPulse, color: 'text-rose-400', group: 'study' },
   { id: 'documents', label: 'Kho & Tải Tài Liệu', badge: 'Tài liệu', icon: FileDown, color: 'text-cyan-400', group: 'study' },
   { id: 'code', label: 'Phòng Code Java/C++', badge: 'Dev IDE', icon: Terminal, color: 'text-amber-400', group: 'study' },
+  { id: 'mindmap', label: 'Xưởng Sơ Đồ Tư Duy', badge: 'Mindmap', icon: Network, color: 'text-violet-400', group: 'study' },
   { id: 'uikit', label: 'Kho Giao Diện Web', badge: '50+ Mẫu', icon: Layout, color: 'text-fuchsia-400', group: 'tools' },
   { id: 'animation', label: 'Animation & Motion FX', badge: 'FX Studio', icon: Flame, color: 'text-orange-400', group: 'tools' },
   { id: 'media', label: 'Xưởng Sáng Tạo Media', badge: 'Video/Audio', icon: Video, color: 'text-purple-400', group: 'tools' },

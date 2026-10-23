@@ -18,3 +18,4 @@ downloads/*
 *.sqlite
 *.sqlite3
 backend/documents/robots_*.txt
+.agents/

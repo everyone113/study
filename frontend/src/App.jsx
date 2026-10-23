@@ -19,6 +19,7 @@ import MobileConnect from './pages/MobileConnect'
 import AnatomyAtlas from './pages/AnatomyAtlas'
 import AnimationLab from './pages/AnimationLab'
 import UIKitStudio from './pages/UIKitStudio'
+import MindmapStudioView from './views/MindmapStudioView'
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -116,6 +117,8 @@ function AppContent() {
         return <DocumentLibrary />
       case 'code':
         return <CodePlayground />
+      case 'mindmap':
+        return <MindmapStudioView setCurrentTab={setCurrentTab} />
       case 'uikit':
         return <UIKitStudio />
       case 'animation':

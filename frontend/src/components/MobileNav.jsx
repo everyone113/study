@@ -17,7 +17,8 @@ import {
   Search,
   ChevronRight,
   CheckCircle2,
-  HardDrive
+  HardDrive,
+  Network
 } from 'lucide-react'
 import { NAV_ITEMS } from './Sidebar'
 
@@ -30,7 +31,7 @@ export default function MobileNav({
   const [searchFilter, setSearchFilter] = useState('')
 
   // Determine current active section for contextual pill bar
-  const isStudyTab = ['academic', 'notes', 'anatomy', 'documents'].includes(currentTab)
+  const isStudyTab = ['academic', 'notes', 'anatomy', 'documents', 'mindmap'].includes(currentTab)
   const isCreativeTab = ['uikit', 'animation', 'media', 'smart', 'mobile'].includes(currentTab)
 
   // Primary 5 Bottom Tabs
@@ -106,7 +107,8 @@ export default function MobileNav({
                 { id: 'academic', label: 'Điểm GPA', icon: GraduationCap, color: 'text-emerald-400' },
                 { id: 'notes', label: 'Lịch & Deadline', icon: CalendarCheck, color: 'text-indigo-400' },
                 { id: 'anatomy', label: 'Giải Phẫu 3D', icon: HeartPulse, color: 'text-rose-400' },
-                { id: 'documents', label: 'Kho Tài Liệu', icon: FileDown, color: 'text-cyan-400' }
+                { id: 'documents', label: 'Kho Tài Liệu', icon: FileDown, color: 'text-cyan-400' },
+                { id: 'mindmap', label: 'Sơ Đồ Mindmap', icon: Network, color: 'text-violet-400' }
               ].map(sub => {
                 const SubIcon = sub.icon
                 const isActive = currentTab === sub.id
